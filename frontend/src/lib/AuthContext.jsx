@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 
 const AuthContext = createContext();
+const GENERIC_LOGIN_ERROR = 'Incorrect email or password.';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -21,11 +22,11 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
 
     try {
-      // Local mode: app metadata is static and auth is optional.
+      // Local mode metadata
       setAppPublicSettings({
         id: 'local-timetrack-app',
         public_settings: {
-          requires_auth: false,
+          requires_auth: true,
         },
       });
       setIsLoadingPublicSettings(false);
@@ -35,21 +36,55 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
     } catch (error) {
-      // Keep app usable locally even if auth endpoint is temporarily unavailable.
-      setUser({ id: 'local-user', name: 'Local User', role: 'admin' });
-      setIsAuthenticated(true);
+      setUser(null);
+      setIsAuthenticated(false);
+      if (error && (error.status === 401 || error.status === 403)) {
+        setAuthError({
+          type: 'auth_required',
+          message: 'Authentication required',
+        });
+      } else {
+        setAuthError({
+          type: 'unknown',
+          message: error && error.message ? error.message : 'Unable to verify authentication',
+        });
+      }
       setIsLoadingAuth(false);
+    }
+  };
+
+  const login = async (email, password) => {
+    setIsLoadingAuth(true);
+    setAuthError(null);
+    try {
+      await base44.auth.login(email, password);
+      await checkAppState();
+      return { ok: true };
+    } catch (error) {
+      setIsLoadingAuth(false);
+      setAuthError({
+        type: 'auth_required',
+        message: GENERIC_LOGIN_ERROR,
+      });
+      return {
+        ok: false,
+        message: GENERIC_LOGIN_ERROR,
+      };
     }
   };
 
   const logout = () => {
     base44.auth.logout();
-    setUser({ id: 'local-user', name: 'Local User', role: 'admin' });
-    setIsAuthenticated(true);
+    setUser(null);
+    setIsAuthenticated(false);
+    setAuthError({
+      type: 'auth_required',
+      message: 'Authentication required',
+    });
   };
 
   const navigateToLogin = () => {
-    // Local mode: no external login redirect.
+    // Login UI is rendered by App when auth is required.
   };
 
   return (
@@ -62,6 +97,7 @@ export const AuthProvider = ({ children }) => {
         authError,
         appPublicSettings,
         logout,
+        login,
         navigateToLogin,
         checkAppState,
       }}

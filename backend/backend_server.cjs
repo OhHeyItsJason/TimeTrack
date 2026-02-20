@@ -6,8 +6,34 @@ const crypto = require('crypto');
 const DATA_DIR = path.join(__dirname, 'backend_data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const PORT = Number(process.env.PORT || 8787);
+const ENV_FILE = path.join(__dirname, '.env');
 
 const ENTITY_NAMES = ['Settings', 'Client', 'WorkSession', 'DayMileage', 'Invoice', 'InvoiceCounter', 'Query'];
+const AUTH_USER_ID = 'local-user';
+
+function loadDotEnv() {
+  if (!fs.existsSync(ENV_FILE)) return;
+  const raw = fs.readFileSync(ENV_FILE, 'utf8');
+  raw.split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.charAt(0) === '#') return;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) return;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim().replace(/^"|"$/g, '');
+    if (process.env[key] == null) {
+      process.env[key] = value;
+    }
+  });
+}
+
+loadDotEnv();
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@timetrack.local';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123';
+const AUTH_SECRET = process.env.AUTH_SECRET || 'dev-only-change-this-secret';
+const TOKEN_TTL_SECONDS = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 60 * 60 * 24 * 7);
+const ALLOW_ADMIN_BYPASS = String(process.env.ALLOW_ADMIN_BYPASS || 'false').toLowerCase() === 'true';
 
 function nowIso() {
   return new Date().toISOString();
@@ -48,17 +74,82 @@ function saveDb(db) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
 
-function getUserId(req) {
-  const headerUser = req.headers['x-user-id'];
-  if (typeof headerUser === 'string' && headerUser.trim()) return headerUser.trim();
+function b64urlEncode(str) {
+  return Buffer.from(str, 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
 
-  const auth = req.headers.authorization;
-  if (typeof auth === 'string' && auth.toLowerCase().indexOf('bearer ') === 0) {
-    const token = auth.slice(7).trim();
-    if (token) return token;
+function b64urlDecode(str) {
+  const padded = str + '==='.slice((str.length + 3) % 4);
+  const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+  return Buffer.from(base64, 'base64').toString('utf8');
+}
+
+function hmac(input) {
+  return crypto.createHmac('sha256', AUTH_SECRET).update(input).digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function signToken(payloadObj) {
+  const payload = b64urlEncode(JSON.stringify(payloadObj));
+  const signature = hmac(payload);
+  return payload + '.' + signature;
+}
+
+function verifyToken(token) {
+  if (!token || token.indexOf('.') === -1) return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const payload = parts[0];
+  const signature = parts[1];
+  if (hmac(payload) !== signature) return null;
+
+  try {
+    const parsed = JSON.parse(b64urlDecode(payload));
+    if (!parsed || !parsed.sub || !parsed.exp) return null;
+    if (Date.now() >= parsed.exp * 1000) return null;
+    return parsed;
+  } catch (err) {
+    return null;
   }
+}
 
-  return 'local-user';
+function getBearerToken(req) {
+  const auth = req.headers.authorization;
+  if (typeof auth !== 'string') return null;
+  if (auth.toLowerCase().indexOf('bearer ') !== 0) return null;
+  const token = auth.slice(7).trim();
+  return token || null;
+}
+
+function isLocalRequest(req) {
+  const host = (req.headers.host || '').toLowerCase();
+  return host.indexOf('localhost') >= 0 || host.indexOf('127.0.0.1') >= 0;
+}
+
+function getBypassUser() {
+  return {
+    sub: AUTH_USER_ID,
+    email: ADMIN_EMAIL,
+    role: 'admin',
+    exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
+  };
+}
+
+function getAuthUser(req) {
+  const token = getBearerToken(req);
+  const parsed = token ? verifyToken(token) : null;
+  if (parsed) return parsed;
+
+  if (ALLOW_ADMIN_BYPASS && isLocalRequest(req)) {
+    return getBypassUser();
+  }
+  return null;
 }
 
 function setCors(res) {
@@ -71,6 +162,15 @@ function sendJson(res, status, payload) {
   setCors(res);
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(payload));
+}
+
+function sendAuthRequired(res) {
+  sendJson(res, 401, {
+    error: 'Authentication required',
+    extra_data: {
+      reason: 'auth_required',
+    },
+  });
 }
 
 function readJsonBody(req) {
@@ -186,8 +286,6 @@ const server = http.createServer(async (req, res) => {
   const parsed = parsePath(req);
   const url = parsed.url;
   const parts = parsed.parts;
-  const userId = getUserId(req);
-
   if (req.method === 'GET' && parts.length === 2 && parts[0] === 'api' && parts[1] === 'health') {
     sendJson(res, 200, { ok: true, timestamp: nowIso() });
     return;
@@ -198,23 +296,67 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       id,
       public_settings: {
-        requires_auth: false,
+        requires_auth: true,
       },
     });
     return;
   }
 
+  if (req.method === 'POST' && parts.length === 3 && parts[0] === 'api' && parts[1] === 'auth' && parts[2] === 'login') {
+    try {
+      const body = await readJsonBody(req);
+      const email = (body.email || '').trim().toLowerCase();
+      const password = body.password || '';
+
+      if (email !== ADMIN_EMAIL.toLowerCase() || password !== ADMIN_PASSWORD) {
+        sendJson(res, 401, { error: 'Invalid email or password' });
+        return;
+      }
+
+      const payload = {
+        sub: AUTH_USER_ID,
+        email: ADMIN_EMAIL,
+        role: 'admin',
+        exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
+      };
+      const token = signToken(payload);
+      sendJson(res, 200, {
+        access_token: token,
+        user: {
+          id: AUTH_USER_ID,
+          email: ADMIN_EMAIL,
+          name: 'Admin',
+          role: 'admin',
+        },
+      });
+    } catch (error) {
+      sendJson(res, 400, { error: error.message || 'Bad request' });
+    }
+    return;
+  }
+
   if (req.method === 'GET' && parts.length === 3 && parts[0] === 'api' && parts[1] === 'auth' && parts[2] === 'me') {
+    const authUser = getAuthUser(req);
+    if (!authUser) {
+      sendAuthRequired(res);
+      return;
+    }
+
     sendJson(res, 200, {
-      id: userId,
-      email: 'local@example.com',
-      name: 'Local User',
+      id: authUser.sub,
+      email: authUser.email || ADMIN_EMAIL,
+      name: 'Admin',
       role: 'admin',
     });
     return;
   }
 
   if (req.method === 'POST' && parts.length === 3 && parts[0] === 'api' && parts[1] === 'app-logs' && parts[2] === 'log-user-in-app') {
+    const authUser = getAuthUser(req);
+    if (!authUser) {
+      sendAuthRequired(res);
+      return;
+    }
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -230,6 +372,12 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 404, { error: 'Unknown entity: ' + entity });
     return;
   }
+  const authUser = getAuthUser(req);
+  if (!authUser) {
+    sendAuthRequired(res);
+    return;
+  }
+  const userId = authUser.sub;
 
   const db = loadDb();
   const rows = db[entity];
@@ -329,4 +477,11 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log('[backend] listening on http://localhost:' + PORT);
   console.log('[backend] data file: ' + DB_FILE);
+  console.log('[backend] auth enabled for: ' + ADMIN_EMAIL);
+  if (ADMIN_PASSWORD === 'changeme123') {
+    console.log('[backend] WARNING: Using default admin password. Set ADMIN_PASSWORD in backend/.env');
+  }
+  if (ALLOW_ADMIN_BYPASS) {
+    console.log('[backend] WARNING: ALLOW_ADMIN_BYPASS is enabled for localhost requests.');
+  }
 });

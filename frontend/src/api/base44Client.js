@@ -1,11 +1,36 @@
 import { appParams } from '@/lib/app-params';
 
 const baseUrl = `${appParams.serverUrl}/api`;
+const TOKEN_STORAGE_KEY = 'base44_access_token';
+
+const getToken = () => {
+  if (appParams.token) return appParams.token;
+  if (typeof window !== 'undefined') {
+    const stored = window.localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (stored) {
+      appParams.token = stored;
+      return stored;
+    }
+  }
+  return null;
+};
+
+const setToken = (token) => {
+  appParams.token = token || null;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  }
+};
 
 const getAuthHeaders = () => {
   const headers = { 'Content-Type': 'application/json' };
-  if (appParams.token) {
-    headers.Authorization = `Bearer ${appParams.token}`;
+  const token = getToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
   return headers;
 };
@@ -57,12 +82,22 @@ const noopIntegration = async () => ({ ok: true });
 export const base44 = {
   entities: entitiesProxy,
   auth: {
+    login: async (email, password) => {
+      const payload = await request('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      if (payload && payload.access_token) {
+        setToken(payload.access_token);
+      }
+      return payload;
+    },
     me: () => request('/auth/me'),
     logout: () => {
-      localStorage.removeItem('base44_access_token');
+      setToken(null);
     },
     redirectToLogin: () => {
-      // Local mode does not require auth.
+      // Handled by app auth state.
     },
   },
   appLogs: {
