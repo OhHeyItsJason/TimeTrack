@@ -1,0 +1,10 @@
+{
+  "name": "timetrack-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node backend_server.cjs",
+    "start": "node backend_server.cjs"
+  }
+}
