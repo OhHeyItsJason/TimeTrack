@@ -63,3 +63,5 @@ git push -u origin main
 - Backend data is in `backend/backend_data/db.json` (ignored by git).
 - Seed template: `backend/backend_data/db.example.json`.
 - Backend contract reverse-engineering notes are in `BACKEND_RECONSTRUCTION.md`.
+- Safe release process: `docs/RELEASE_PROCESS.md`.
+- Supabase migration guide: `supabase/README.md`.
