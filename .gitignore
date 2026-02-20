@@ -29,3 +29,7 @@ backend/backend_data/db.json
 *.sw?
 
 .env
+
+# accidental command-text files
+ssh-keygen\ -t\ ed25519\ -C\ \"your-email@example.com\"
+ssh-keygen\ -t\ ed25519\ -C\ \"your-email@example.com\".pub
