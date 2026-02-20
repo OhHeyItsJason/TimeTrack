@@ -12,6 +12,10 @@ Example:
 
 `20260220094500_create_invoice_table.sql`
 
+Current initial schema migration:
+
+`supabase/migrations/20260220060000_initial_schema.sql`
+
 ## Migration safety rules
 
 - Wrap every migration in:
@@ -35,3 +39,10 @@ Set these secrets in both `staging` and `production` GitHub environments:
 - Production deploy:
   - Run the **Supabase Migrations** workflow manually with target `production`.
   - Use required reviewers on the `production` environment for approval gating.
+
+## Backend storage switch
+
+Backend uses local JSON by default.
+
+When `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set in backend env,
+the backend automatically switches to Supabase tables using the same API contract.

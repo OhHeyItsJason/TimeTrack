@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
+  },
   "scripts": {
     "dev": "node backend_server.cjs",
     "start": "node backend_server.cjs",

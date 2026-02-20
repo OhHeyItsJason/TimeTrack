@@ -22,6 +22,7 @@ Required values:
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
 - `AUTH_SECRET`
+- `CORS_ALLOW_ORIGIN`
 
 Default login page is served by the frontend and calls `POST /api/auth/login`.
 
@@ -31,6 +32,17 @@ Optional local safety switch:
 
 When enabled, localhost requests can access the app as admin even without a token.
 Use this only for local testing and set it to `false` for production.
+
+## Supabase storage mode
+
+By default backend uses local JSON file storage.
+
+To switch to Supabase, set both in `.env`:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+When present, backend uses Supabase tables and keeps the same API contract.
 
 ## Data storage
 

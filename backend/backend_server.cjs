@@ -10,6 +10,15 @@ const ENV_FILE = path.join(__dirname, '.env');
 
 const ENTITY_NAMES = ['Settings', 'Client', 'WorkSession', 'DayMileage', 'Invoice', 'InvoiceCounter', 'Query'];
 const AUTH_USER_ID = 'local-user';
+const ENTITY_TABLES = {
+  Settings: 'settings',
+  Client: 'client',
+  WorkSession: 'work_session',
+  DayMileage: 'day_mileage',
+  Invoice: 'invoice',
+  InvoiceCounter: 'invoice_counter',
+  Query: 'query_record',
+};
 
 function loadDotEnv() {
   if (!fs.existsSync(ENV_FILE)) return;
@@ -34,6 +43,19 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123';
 const AUTH_SECRET = process.env.AUTH_SECRET || 'dev-only-change-this-secret';
 const TOKEN_TTL_SECONDS = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 60 * 60 * 24 * 7);
 const ALLOW_ADMIN_BYPASS = String(process.env.ALLOW_ADMIN_BYPASS || 'false').toLowerCase() === 'true';
+const CORS_ALLOW_ORIGIN = process.env.CORS_ALLOW_ORIGIN || '*';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+
+let supabaseClient = null;
+if (USE_SUPABASE) {
+  // Lazy import via require for CJS runtime.
+  const { createClient } = require('@supabase/supabase-js');
+  supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  });
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -153,7 +175,7 @@ function getAuthUser(req) {
 }
 
 function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', CORS_ALLOW_ORIGIN);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-App-Id, X-User-Id');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
 }
@@ -222,6 +244,134 @@ function sortRows(rows, sortParam) {
   });
 }
 
+async function loadEntityRows(entity, userId, sortParam) {
+  if (!USE_SUPABASE) {
+    const db = loadDb();
+    const rows = db[entity].filter((r) => r.created_by === userId);
+    return sortRows(rows, sortParam || '');
+  }
+
+  const table = ENTITY_TABLES[entity];
+  let query = supabaseClient.from(table).select('*').eq('created_by', userId);
+  if (sortParam) {
+    const isDesc = sortParam.charAt(0) === '-';
+    const field = isDesc ? sortParam.slice(1) : sortParam;
+    query = query.order(field, { ascending: !isDesc });
+  }
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function filterEntityRows(entity, userId, filters) {
+  if (!USE_SUPABASE) {
+    const scoped = await loadEntityRows(entity, userId, '');
+    return scoped.filter((row) => Object.keys(filters).every((key) => String(row[key]) === String(filters[key])));
+  }
+
+  const table = ENTITY_TABLES[entity];
+  let query = supabaseClient.from(table).select('*').eq('created_by', userId);
+  Object.keys(filters).forEach((key) => {
+    query = query.eq(key, filters[key]);
+  });
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function getEntityRowById(entity, userId, id) {
+  if (!USE_SUPABASE) {
+    const db = loadDb();
+    const row = db[entity].find((r) => r.id === id && r.created_by === userId);
+    return row || null;
+  }
+
+  const table = ENTITY_TABLES[entity];
+  const { data, error } = await supabaseClient
+    .from(table)
+    .select('*')
+    .eq('id', id)
+    .eq('created_by', userId)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data || null;
+}
+
+async function createEntityRow(entity, userId, payload) {
+  const row = Object.assign(
+    {
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + String(Math.random()).slice(2),
+      created_by: userId,
+      created_date: nowIso(),
+      updated_date: nowIso(),
+    },
+    payload
+  );
+
+  if (!USE_SUPABASE) {
+    const db = loadDb();
+    db[entity].push(row);
+    saveDb(db);
+    return row;
+  }
+
+  const table = ENTITY_TABLES[entity];
+  const { data, error } = await supabaseClient.from(table).insert(row).select('*').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function updateEntityRow(entity, userId, id, payload) {
+  const existing = await getEntityRowById(entity, userId, id);
+  if (!existing) return null;
+
+  const next = Object.assign({}, existing, payload, { updated_date: nowIso() });
+
+  if (!USE_SUPABASE) {
+    const db = loadDb();
+    const idx = db[entity].findIndex((r) => r.id === id && r.created_by === userId);
+    if (idx === -1) return null;
+    db[entity][idx] = next;
+    saveDb(db);
+    return next;
+  }
+
+  const table = ENTITY_TABLES[entity];
+  const { data, error } = await supabaseClient
+    .from(table)
+    .update(next)
+    .eq('id', id)
+    .eq('created_by', userId)
+    .select('*')
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function deleteEntityRow(entity, userId, id) {
+  const existing = await getEntityRowById(entity, userId, id);
+  if (!existing) return null;
+
+  if (!USE_SUPABASE) {
+    const db = loadDb();
+    const idx = db[entity].findIndex((r) => r.id === id && r.created_by === userId);
+    if (idx === -1) return null;
+    const deleted = db[entity].splice(idx, 1)[0];
+    saveDb(db);
+    return deleted;
+  }
+
+  const table = ENTITY_TABLES[entity];
+  const { error } = await supabaseClient
+    .from(table)
+    .delete()
+    .eq('id', id)
+    .eq('created_by', userId);
+  if (error) throw new Error(error.message);
+  return existing;
+}
+
 function validateEntityRules(entity, rows, payload, userId, mode, currentId) {
   const opMode = mode || 'create';
   const rowId = currentId || null;
@@ -286,8 +436,9 @@ const server = http.createServer(async (req, res) => {
   const parsed = parsePath(req);
   const url = parsed.url;
   const parts = parsed.parts;
+
   if (req.method === 'GET' && parts.length === 2 && parts[0] === 'api' && parts[1] === 'health') {
-    sendJson(res, 200, { ok: true, timestamp: nowIso() });
+    sendJson(res, 200, { ok: true, timestamp: nowIso(), storage: USE_SUPABASE ? 'supabase' : 'json' });
     return;
   }
 
@@ -372,6 +523,7 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 404, { error: 'Unknown entity: ' + entity });
     return;
   }
+
   const authUser = getAuthUser(req);
   if (!authUser) {
     sendAuthRequired(res);
@@ -379,109 +531,91 @@ const server = http.createServer(async (req, res) => {
   }
   const userId = authUser.sub;
 
-  const db = loadDb();
-  const rows = db[entity];
+  try {
+    if (req.method === 'GET' && parts.length === 3) {
+      const sort = url.searchParams.get('sort') || '';
+      const rows = await loadEntityRows(entity, userId, sort);
+      sendJson(res, 200, rows);
+      return;
+    }
 
-  if (req.method === 'GET' && parts.length === 3) {
-    const sort = url.searchParams.get('sort') || '';
-    const scoped = rows.filter((r) => r.created_by === userId);
-    sendJson(res, 200, sortRows(scoped, sort));
-    return;
-  }
+    if (req.method === 'GET' && parts.length === 4 && parts[3] === 'filter') {
+      const filters = {};
+      url.searchParams.forEach((value, key) => {
+        filters[key] = value;
+      });
+      const rows = await filterEntityRows(entity, userId, filters);
+      sendJson(res, 200, rows);
+      return;
+    }
 
-  if (req.method === 'GET' && parts.length === 4 && parts[3] === 'filter') {
-    const filters = {};
-    url.searchParams.forEach((value, key) => {
-      filters[key] = value;
-    });
-
-    const scoped = rows.filter((r) => r.created_by === userId);
-    const filtered = scoped.filter((row) => {
-      return Object.keys(filters).every((key) => String(row[key]) === filters[key]);
-    });
-
-    sendJson(res, 200, filtered);
-    return;
-  }
-
-  if (req.method === 'POST' && parts.length === 3) {
-    try {
+    if (req.method === 'POST' && parts.length === 3) {
       const payload = await readJsonBody(req);
-      const violation = validateEntityRules(entity, rows, payload, userId, 'create', null);
+      const rowsForValidation = await loadEntityRows(entity, userId, '');
+      const violation = validateEntityRules(entity, rowsForValidation, payload, userId, 'create', null);
       if (violation) {
         sendJson(res, 400, { error: violation });
         return;
       }
 
-      const row = Object.assign(
-        {
-          id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + String(Math.random()).slice(2),
-          created_by: userId,
-          created_date: nowIso(),
-          updated_date: nowIso(),
-        },
-        payload
-      );
-
-      rows.push(row);
-      saveDb(db);
-      sendJson(res, 201, row);
-    } catch (error) {
-      sendJson(res, 400, { error: error.message || 'Bad request' });
-    }
-    return;
-  }
-
-  if (req.method === 'PATCH' && parts.length === 4) {
-    const id = parts[3];
-    const index = rows.findIndex((r) => r.id === id && r.created_by === userId);
-    if (index === -1) {
-      sendJson(res, 404, { error: 'Record not found' });
+      const created = await createEntityRow(entity, userId, payload);
+      sendJson(res, 201, created);
       return;
     }
 
-    try {
+    if (req.method === 'PATCH' && parts.length === 4) {
+      const id = parts[3];
+      const existing = await getEntityRowById(entity, userId, id);
+      if (!existing) {
+        sendJson(res, 404, { error: 'Record not found' });
+        return;
+      }
+
       const payload = await readJsonBody(req);
-      const next = Object.assign({}, rows[index], payload, { updated_date: nowIso() });
-      const violation = validateEntityRules(entity, rows, next, userId, 'update', id);
+      const next = Object.assign({}, existing, payload, { updated_date: nowIso() });
+      const rowsForValidation = await loadEntityRows(entity, userId, '');
+      const violation = validateEntityRules(entity, rowsForValidation, next, userId, 'update', id);
       if (violation) {
         sendJson(res, 400, { error: violation });
         return;
       }
 
-      rows[index] = next;
-      saveDb(db);
-      sendJson(res, 200, next);
-    } catch (error) {
-      sendJson(res, 400, { error: error.message || 'Bad request' });
-    }
-    return;
-  }
-
-  if (req.method === 'DELETE' && parts.length === 4) {
-    const id = parts[3];
-    const index = rows.findIndex((r) => r.id === id && r.created_by === userId);
-    if (index === -1) {
-      sendJson(res, 404, { error: 'Record not found' });
+      const updated = await updateEntityRow(entity, userId, id, payload);
+      sendJson(res, 200, updated);
       return;
     }
-    const deleted = rows.splice(index, 1)[0];
-    saveDb(db);
-    sendJson(res, 200, deleted);
-    return;
-  }
 
-  sendJson(res, 405, { error: 'Method not allowed' });
+    if (req.method === 'DELETE' && parts.length === 4) {
+      const id = parts[3];
+      const deleted = await deleteEntityRow(entity, userId, id);
+      if (!deleted) {
+        sendJson(res, 404, { error: 'Record not found' });
+        return;
+      }
+      sendJson(res, 200, deleted);
+      return;
+    }
+
+    sendJson(res, 405, { error: 'Method not allowed' });
+  } catch (error) {
+    sendJson(res, 500, { error: error.message || 'Internal server error' });
+  }
 });
 
 server.listen(PORT, () => {
   console.log('[backend] listening on http://localhost:' + PORT);
-  console.log('[backend] data file: ' + DB_FILE);
   console.log('[backend] auth enabled for: ' + ADMIN_EMAIL);
+  console.log('[backend] storage mode: ' + (USE_SUPABASE ? 'supabase' : 'json'));
+  if (!USE_SUPABASE) {
+    console.log('[backend] data file: ' + DB_FILE);
+  }
   if (ADMIN_PASSWORD === 'changeme123') {
     console.log('[backend] WARNING: Using default admin password. Set ADMIN_PASSWORD in backend/.env');
   }
   if (ALLOW_ADMIN_BYPASS) {
     console.log('[backend] WARNING: ALLOW_ADMIN_BYPASS is enabled for localhost requests.');
+  }
+  if (CORS_ALLOW_ORIGIN === '*') {
+    console.log('[backend] WARNING: CORS_ALLOW_ORIGIN is * (good for local only).');
   }
 });

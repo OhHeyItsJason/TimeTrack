@@ -65,3 +65,4 @@ git push -u origin main
 - Backend contract reverse-engineering notes are in `BACKEND_RECONSTRUCTION.md`.
 - Safe release process: `docs/RELEASE_PROCESS.md`.
 - Supabase migration guide: `supabase/README.md`.
+- End-to-end setup checklist: `docs/SETUP_EVERYWHERE.md`.
