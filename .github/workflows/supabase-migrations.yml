@@ -43,6 +43,16 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           supabase login --token "${SUPABASE_ACCESS_TOKEN}"
+      - name: Validate project ref format (Staging)
+        if: ${{ steps.check_secrets.outputs.should_run == 'true' }}
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          if ! echo "${SUPABASE_PROJECT_REF}" | grep -Eq '^[a-z0-9]{20}$'; then
+            echo "Invalid SUPABASE_PROJECT_REF format for staging."
+            echo "Expected a 20-character project ref (not a URL)."
+            exit 1
+          fi
       - name: Push Migrations to Staging
         if: ${{ steps.check_secrets.outputs.should_run == 'true' }}
         env:
@@ -80,6 +90,16 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           supabase login --token "${SUPABASE_ACCESS_TOKEN}"
+      - name: Validate project ref format (Production)
+        if: ${{ steps.check_secrets.outputs.should_run == 'true' }}
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          if ! echo "${SUPABASE_PROJECT_REF}" | grep -Eq '^[a-z0-9]{20}$'; then
+            echo "Invalid SUPABASE_PROJECT_REF format for production."
+            echo "Expected a 20-character project ref (not a URL)."
+            exit 1
+          fi
       - name: Push Migrations to Production
         if: ${{ steps.check_secrets.outputs.should_run == 'true' }}
         env:
