@@ -1,6 +1,11 @@
 name: Supabase Migrations
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/*.sql'
+      - '.github/workflows/supabase-migrations.yml'
   workflow_dispatch:
     inputs:
       target:
@@ -15,7 +20,7 @@ on:
 jobs:
   deploy-staging:
     name: Deploy Migrations (Staging)
-    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging' }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging') }}
     runs-on: ubuntu-latest
     environment: staging
     steps:
