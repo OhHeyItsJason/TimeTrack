@@ -37,12 +37,15 @@ jobs:
 
   migration-validate:
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('supabase/migrations/*.sql') != '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate Migration File Naming
         run: |
           set -euo pipefail
+          if ! ls supabase/migrations/*.sql >/dev/null 2>&1; then
+            echo "No migration files found; skipping migration validation."
+            exit 0
+          fi
           bad=0
           for f in supabase/migrations/*.sql; do
             [ -f "$f" ] || continue
@@ -58,6 +61,10 @@ jobs:
       - name: Validate Migration Transaction Wrapper
         run: |
           set -euo pipefail
+          if ! ls supabase/migrations/*.sql >/dev/null 2>&1; then
+            echo "No migration files found; skipping migration validation."
+            exit 0
+          fi
           bad=0
           for f in supabase/migrations/*.sql; do
             [ -f "$f" ] || continue
