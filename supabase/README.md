@@ -34,11 +34,10 @@ Set these secrets in both `staging` and `production` GitHub environments:
 
 ## Deploy flow
 
-- Push to `main` with migration changes:
-  - Auto deploys to `staging` (if staging secrets are configured).
-- Production deploy:
-  - Run the **Supabase Migrations** workflow manually with target `production`.
-  - Use required reviewers on the `production` environment for approval gating.
+- Run the **Supabase Migrations** workflow manually with target `staging`.
+- Validate staging behavior.
+- Run the same workflow manually with target `production`.
+- Use required reviewers on the `production` environment for approval gating.
 
 ## Backend storage switch
 

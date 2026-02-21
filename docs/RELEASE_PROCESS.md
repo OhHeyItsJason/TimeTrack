@@ -13,7 +13,7 @@ Ship changes quickly while reducing the chance of breaking production.
    - Backend syntax checks
    - Migration validation (if SQL migrations changed)
 4. Merge to `main`.
-5. Staging database migrations auto-apply.
+5. Run staging database migrations manually via GitHub Actions.
 6. Verify staging behavior.
 7. Trigger production migration workflow manually.
 8. Approve production deploy via GitHub environment protection.
