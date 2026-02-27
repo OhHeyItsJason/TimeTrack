@@ -1,6 +1,6 @@
 import { appParams } from '@/lib/app-params';
 
-const baseUrl = `${appParams.serverUrl}/api`;
+const baseUrl = appParams.serverUrl ? `${appParams.serverUrl}/api` : '/api';
 const TOKEN_STORAGE_KEY = 'base44_access_token';
 
 const getToken = () => {

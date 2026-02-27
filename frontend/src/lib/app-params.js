@@ -37,7 +37,7 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 const getAppParams = () => {
 	return {
 		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_APP_ID || "local-timetrack-app" }),
-		serverUrl: getAppParamValue("server_url", { defaultValue: import.meta.env.VITE_API_BASE_URL || "http://localhost:8787" }),
+		serverUrl: getAppParamValue("server_url", { defaultValue: import.meta.env.VITE_API_BASE_URL || "" }),
 		token: getAppParamValue("access_token", { removeFromUrl: true }),
 		fromUrl: getAppParamValue("from_url", { defaultValue: window.location.href }),
 		functionsVersion: getAppParamValue("functions_version"),
