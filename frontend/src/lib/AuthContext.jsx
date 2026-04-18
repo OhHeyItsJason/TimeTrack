@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { appClient } from '@/api/appClient';
 
 const AuthContext = createContext();
 const GENERIC_LOGIN_ERROR = 'Incorrect email or password.';
@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
       });
       setIsLoadingPublicSettings(false);
 
-      const currentUser = await base44.auth.me();
+      const currentUser = await appClient.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     setAuthError(null);
     try {
-      await base44.auth.login(email, password);
+      await appClient.auth.login(email, password);
       await checkAppState();
       return { ok: true };
     } catch (error) {
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    base44.auth.logout();
+    appClient.auth.logout();
     setUser(null);
     setIsAuthenticated(false);
     setAuthError({

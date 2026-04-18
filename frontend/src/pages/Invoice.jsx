@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { appClient } from "@/api/appClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,52 +40,52 @@ export default function Invoice() {
 
   const { data: sessions = [] } = useQuery({
     queryKey: ['workSessions'],
-    queryFn: () => base44.entities.WorkSession.list('-date'),
+    queryFn: () => appClient.entities.WorkSession.list('-date'),
   });
 
   const { data: settings = [] } = useQuery({
     queryKey: ['settings'],
-    queryFn: () => base44.entities.Settings.list(),
+    queryFn: () => appClient.entities.Settings.list(),
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list('name'),
+    queryFn: () => appClient.entities.Client.list('name'),
   });
 
   const { data: invoices = [] } = useQuery({
     queryKey: ['invoices'],
-    queryFn: () => base44.entities.Invoice.list(),
+    queryFn: () => appClient.entities.Invoice.list(),
   });
 
   const { data: invoiceCounters = [] } = useQuery({
     queryKey: ['invoiceCounters'],
-    queryFn: () => base44.entities.InvoiceCounter.list(),
+    queryFn: () => appClient.entities.InvoiceCounter.list(),
   });
 
   const createClientMutation = useMutation({
-    mutationFn: (data) => base44.entities.Client.create(data),
+    mutationFn: (data) => appClient.entities.Client.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
   });
 
   const createInvoiceMutation = useMutation({
-    mutationFn: (data) => base44.entities.Invoice.create(data),
+    mutationFn: (data) => appClient.entities.Invoice.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
     },
   });
 
   const createCounterMutation = useMutation({
-    mutationFn: (data) => base44.entities.InvoiceCounter.create(data),
+    mutationFn: (data) => appClient.entities.InvoiceCounter.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoiceCounters'] });
     },
   });
 
   const updateCounterMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.InvoiceCounter.update(id, data),
+    mutationFn: ({ id, data }) => appClient.entities.InvoiceCounter.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoiceCounters'] });
     },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { appClient } from "@/api/appClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,17 +22,17 @@ export default function Settings() {
 
   const { data: settings = [] } = useQuery({
     queryKey: ['settings'],
-    queryFn: () => base44.entities.Settings.list(),
+    queryFn: () => appClient.entities.Settings.list(),
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list('name'),
+    queryFn: () => appClient.entities.Client.list('name'),
   });
 
   const { data: allSessions = [] } = useQuery({
     queryKey: ['workSessions'],
-    queryFn: () => base44.entities.WorkSession.list(),
+    queryFn: () => appClient.entities.WorkSession.list(),
   });
 
   const existingSettings = settings[0] || {};
@@ -62,7 +62,7 @@ export default function Settings() {
   }, [existingSettings.id]);
 
   const createSettingsMutation = useMutation({
-    mutationFn: (data) => base44.entities.Settings.create(data),
+    mutationFn: (data) => appClient.entities.Settings.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       alert('Settings saved successfully!');
@@ -70,7 +70,7 @@ export default function Settings() {
   });
 
   const updateSettingsMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Settings.update(id, data),
+    mutationFn: ({ id, data }) => appClient.entities.Settings.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       alert('Settings updated successfully!');
@@ -78,21 +78,21 @@ export default function Settings() {
   });
 
   const createClientMutation = useMutation({
-    mutationFn: (data) => base44.entities.Client.create(data),
+    mutationFn: (data) => appClient.entities.Client.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
   });
 
   const updateClientMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Client.update(id, data),
+    mutationFn: ({ id, data }) => appClient.entities.Client.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
   });
 
   const archiveClientMutation = useMutation({
-    mutationFn: ({ id, is_archived }) => base44.entities.Client.update(id, { is_archived }),
+    mutationFn: ({ id, is_archived }) => appClient.entities.Client.update(id, { is_archived }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       setIsArchiveConfirmOpen(false);

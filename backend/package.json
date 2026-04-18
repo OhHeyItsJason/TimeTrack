@@ -9,6 +9,6 @@
   "scripts": {
     "dev": "node backend_server.cjs",
     "start": "node backend_server.cjs",
-    "import:base44": "node import/import_base44_csv.cjs"
+    "import:legacy": "node import/import_legacy_csv.cjs"
   }
 }

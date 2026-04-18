@@ -16,6 +16,11 @@ dist
 dist-ssr
 *.local
 backend/backend_data/db.json
+backend/backend_data/backups/
+backend/import/base44_csv/
+backend/import/legacy_csv/
+supabase/.temp/
+.claude/
 
 # Editor directories and files
 .vscode/*

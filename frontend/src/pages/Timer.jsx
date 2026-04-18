@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { appClient } from "@/api/appClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,13 +37,13 @@ const [selectedClientId, setSelectedClientId] = useState("");
 
   const { data: allSessions = [] } = useQuery({
     queryKey: ['workSessions'],
-    queryFn: () => base44.entities.WorkSession.list('-start_time'),
+    queryFn: () => appClient.entities.WorkSession.list('-start_time'),
     refetchInterval: 3000,
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list('name'),
+    queryFn: () => appClient.entities.Client.list('name'),
   });
 
   const todaySessions = allSessions.filter(s => s.date === today);
@@ -78,14 +78,14 @@ const [selectedClientId, setSelectedClientId] = useState("");
     });
 
   const createSessionMutation = useMutation({
-    mutationFn: (sessionData) => base44.entities.WorkSession.create(sessionData),
+    mutationFn: (sessionData) => appClient.entities.WorkSession.create(sessionData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workSessions'] });
     },
   });
 
   const updateSessionMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.WorkSession.update(id, data),
+    mutationFn: ({ id, data }) => appClient.entities.WorkSession.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workSessions'] });
     },
@@ -108,9 +108,9 @@ const [selectedClientId, setSelectedClientId] = useState("");
 
   const handleSaveClient = async (clientData, clientId) => {
     if (clientId) {
-      await base44.entities.Client.update(clientId, clientData);
+      await appClient.entities.Client.update(clientId, clientData);
     } else {
-      const newClient = await base44.entities.Client.create(clientData);
+      const newClient = await appClient.entities.Client.create(clientData);
       if (newClient?.id) {
         setSelectedClientId(newClient.id);
       }

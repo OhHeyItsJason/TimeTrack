@@ -221,9 +221,11 @@ export default async function handler(req, res) {
     return;
   }
 
-  const parts = Array.isArray(req.query.path)
-    ? req.query.path
-    : [req.query.path].filter(Boolean);
+  const rawPath = req.query.path;
+  const parts = (Array.isArray(rawPath) ? rawPath : [rawPath])
+    .filter(Boolean)
+    .flatMap((value) => String(value).split('/'))
+    .filter(Boolean);
 
   // GET /api/health
   if (req.method === 'GET' && parts.length === 1 && parts[0] === 'health') {

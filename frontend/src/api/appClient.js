@@ -1,7 +1,7 @@
 import { appParams } from '@/lib/app-params';
 
 const baseUrl = appParams.serverUrl ? `${appParams.serverUrl}/api` : '/api';
-const TOKEN_STORAGE_KEY = 'base44_access_token';
+const TOKEN_STORAGE_KEY = 'timetrack_access_token';
 
 const getToken = () => {
   if (appParams.token) return appParams.token;
@@ -79,7 +79,7 @@ const entitiesProxy = new Proxy(
 
 const noopIntegration = async () => ({ ok: true });
 
-export const base44 = {
+export const appClient = {
   entities: entitiesProxy,
   auth: {
     login: async (email, password) => {

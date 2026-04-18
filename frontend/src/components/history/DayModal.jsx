@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { appClient } from "@/api/appClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,17 +39,17 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
 
   const { data: dayMileageRecords = [] } = useQuery({
     queryKey: ['dayMileage', dateStr],
-    queryFn: () => base44.entities.DayMileage.filter({ date: dateStr }),
+    queryFn: () => appClient.entities.DayMileage.filter({ date: dateStr }),
     enabled: !!dateStr && isOpen,
   });
 
   const createDayMileageMutation = useMutation({
-    mutationFn: (data) => base44.entities.DayMileage.create(data),
+    mutationFn: (data) => appClient.entities.DayMileage.create(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['dayMileage'] }),
   });
 
   const updateDayMileageMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.DayMileage.update(id, data),
+    mutationFn: ({ id, data }) => appClient.entities.DayMileage.update(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['dayMileage'] }),
   });
 

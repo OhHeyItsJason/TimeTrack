@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const IMPORT_DIR = path.join(__dirname, 'base44_csv');
+const IMPORT_DIR = path.join(__dirname, 'legacy_csv');
 const BACKEND_DIR = path.join(__dirname, '..');
 const DATA_DIR = path.join(BACKEND_DIR, 'backend_data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { appClient } from "@/api/appClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,47 +22,47 @@ export default function History() {
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['workSessions'],
-    queryFn: () => base44.entities.WorkSession.list('-date'),
+    queryFn: () => appClient.entities.WorkSession.list('-date'),
   });
 
   const { data: settings = [] } = useQuery({
     queryKey: ['settings'],
-    queryFn: () => base44.entities.Settings.list(),
+    queryFn: () => appClient.entities.Settings.list(),
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list('name'),
+    queryFn: () => appClient.entities.Client.list('name'),
   });
 
   const { data: dayMileageRecords = [] } = useQuery({
     queryKey: ['dayMileage'],
-    queryFn: () => base44.entities.DayMileage.list(),
+    queryFn: () => appClient.entities.DayMileage.list(),
   });
 
   const { data: invoices = [] } = useQuery({
     queryKey: ['invoices'],
-    queryFn: () => base44.entities.Invoice.list('-start_date'),
+    queryFn: () => appClient.entities.Invoice.list('-start_date'),
   });
 
   const hourlyRate = settings[0]?.hourly_rate || 50;
 
   const updateSessionMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.WorkSession.update(id, data),
+    mutationFn: ({ id, data }) => appClient.entities.WorkSession.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workSessions'] });
     },
   });
 
   const createSessionMutation = useMutation({
-    mutationFn: (data) => base44.entities.WorkSession.create(data),
+    mutationFn: (data) => appClient.entities.WorkSession.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workSessions'] });
     },
   });
 
   const deleteSessionMutation = useMutation({
-    mutationFn: (id) => base44.entities.WorkSession.delete(id),
+    mutationFn: (id) => appClient.entities.WorkSession.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workSessions'] });
     },

@@ -1,6 +1,6 @@
 # TimeTrack Backend Reconstruction
 
-This document reverse-engineers the backend contract expected by the exported Base44 frontend.
+This document reverse-engineers the backend contract expected by the exported TimeTrack frontend.
 
 ## 1) Required auth/session behavior
 
@@ -128,7 +128,7 @@ Notes:
 
 ## 3) API contract expected by frontend SDK layer
 
-The frontend uses Base44-style entity methods:
+The frontend uses app-client entity methods:
 
 - `list(sort?)`
 - `filter(whereObject)`
@@ -180,7 +180,7 @@ The export includes one backend function:
 - `functions/generateInvoicePDF.js`
 
 Behavior:
-- Authenticates request with `base44.auth.me()`.
+- Authenticates request with `appClient.auth.me()`.
 - Accepts invoice payload JSON.
 - Returns generated PDF bytes.
 
