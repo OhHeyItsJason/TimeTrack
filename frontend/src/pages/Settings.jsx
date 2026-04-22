@@ -160,23 +160,23 @@ export default function Settings() {
 
 return (
     <div className="min-h-screen bg-[#f2f2f7] p-4 md:p-8 pb-24">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
+          className="mb-8"
         >
           <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 mb-2">
             Settings
           </h1>
-          <p className="text-gray-500 text-lg">Configure your billing rates and invoice details</p>
+          <p className="text-gray-500 text-lg">Configure your billing defaults, invoice details, and client records.</p>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="space-y-6"
+          className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] xl:items-start"
         >
 <Card className="shadow-lg border-0 bg-white/80 ios-blur rounded-[28px]">
             <CardHeader>
@@ -185,39 +185,46 @@ return (
                 Billing & Invoice Settings
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="hourlyRate" className="text-gray-700 font-semibold">
-                  Default Hourly Rate ($/hr)
-                </Label>
-                <Input
-                  id="hourlyRate"
-                  type="number"
-                  value={hourlyRate}
-                  onChange={(e) => setHourlyRate(e.target.value)}
-                  placeholder="50"
-                  className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 text-lg font-semibold rounded-[14px]"
-                />
-                <p className="text-xs text-gray-500">Used when a client doesn't have a specific rate set</p>
-              </div>
+            <CardContent className="space-y-5">
+              <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
+                <div className="space-y-2 rounded-[20px] border border-blue-100 bg-blue-50/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">
+                    Default Rate
+                  </p>
+                  <Label htmlFor="hourlyRate" className="text-gray-700 font-semibold">
+                    Hourly Rate ($/hr)
+                  </Label>
+                  <Input
+                    id="hourlyRate"
+                    type="number"
+                    value={hourlyRate}
+                    onChange={(e) => setHourlyRate(e.target.value)}
+                    placeholder="50"
+                    className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 text-lg font-semibold rounded-[14px]"
+                  />
+                  <p className="text-xs text-gray-500">Used when a client doesn&apos;t have a specific rate set.</p>
+                </div>
 
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Invoice Information</h3>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName" className="text-gray-700 font-medium">
-                      Your Name / Company Name
-                    </Label>
-                    <Input
-                      id="companyName"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      placeholder="Your Name"
-                      className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 rounded-[14px]"
-                    />
+                <div className="rounded-[20px] border border-gray-100 bg-white/70 p-4 md:p-5">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Invoice Information</h3>
+                    <p className="mt-1 text-sm text-gray-500">Shown by default on generated invoices.</p>
                   </div>
 
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="companyName" className="text-gray-700 font-medium">
+                        Your Name / Company Name
+                      </Label>
+                      <Input
+                        id="companyName"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        placeholder="Your Name"
+                        className="h-12 bg-white border-gray-200 text-base text-gray-900 placeholder:text-gray-400 rounded-[14px]"
+                      />
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="email" className="text-gray-700 font-medium">Email</Label>
                       <Input
@@ -226,7 +233,7 @@ return (
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="your@email.com"
-                        className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 rounded-[14px]"
+                        className="h-12 bg-white border-gray-200 text-base text-gray-900 placeholder:text-gray-400 rounded-[14px]"
                       />
                     </div>
 
@@ -238,35 +245,35 @@ return (
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="+1 (555) 123-4567"
-                        className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 rounded-[14px]"
+                        className="h-12 bg-white border-gray-200 text-base text-gray-900 placeholder:text-gray-400 rounded-[14px]"
                       />
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="address" className="text-gray-700 font-medium">Address</Label>
-                    <Textarea
-                      id="address"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="123 Main St, City, State 12345"
-                      rows={2}
-                      className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 rounded-[14px]"
-                    />
-                  </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="address" className="text-gray-700 font-medium">Address</Label>
+                      <Textarea
+                        id="address"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="123 Main St, City, State 12345"
+                        rows={5}
+                        className="min-h-32 resize-y bg-white border-gray-200 text-base text-gray-900 placeholder:text-gray-400 rounded-[14px]"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="invoiceNotes" className="text-gray-700 font-medium">
-                      Default Invoice Notes
-                    </Label>
-                    <Textarea
-                      id="invoiceNotes"
-                      value={invoiceNotes}
-                      onChange={(e) => setInvoiceNotes(e.target.value)}
-                      placeholder="Payment terms, thank you message, etc."
-                      rows={3}
-                      className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 rounded-[14px]"
-                    />
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="invoiceNotes" className="text-gray-700 font-medium">
+                        Default Invoice Notes
+                      </Label>
+                      <Textarea
+                        id="invoiceNotes"
+                        value={invoiceNotes}
+                        onChange={(e) => setInvoiceNotes(e.target.value)}
+                        placeholder="Payment terms, thank you message, etc."
+                        rows={6}
+                        className="min-h-40 resize-y bg-white border-gray-200 text-base text-gray-900 placeholder:text-gray-400 rounded-[14px]"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -282,13 +289,16 @@ return (
             </CardContent>
           </Card>
 
-<Card className="shadow-lg border-0 bg-white/80 ios-blur rounded-[28px]">
+<Card className="shadow-lg border-0 bg-white/80 ios-blur rounded-[28px] xl:sticky xl:top-6">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-xl text-gray-900">
-                  <Users className="w-5 h-5 text-purple-600" />
-                  Client Management
-                </CardTitle>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl text-gray-900">
+                    <Users className="w-5 h-5 text-purple-600" />
+                    Client Management
+                  </CardTitle>
+                  <p className="mt-1 text-sm text-gray-500">Manage active and archived client records.</p>
+                </div>
                 <Button
                   onClick={() => {
                     setEditingClient(null);
@@ -303,40 +313,40 @@ return (
             </CardHeader>
             <CardContent>
               {activeClients.length === 0 && archivedClients.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <div className="py-8 text-center">
+                  <Users className="mx-auto mb-3 h-12 w-12 text-gray-300" />
                   <p className="text-gray-600">No clients yet</p>
                   <p className="text-sm text-gray-500">Add your first client to get started</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   {activeClients.length > 0 && (
                     <div className="space-y-3">
                       {activeClients.map((client) => (
 <div
                           key={client.id}
-                          className="bg-gray-50 border border-gray-100 rounded-[16px] p-4 hover:border-purple-200 transition-all"
+                          className="rounded-[16px] border border-gray-100 bg-gray-50 p-4 transition-all hover:border-purple-200"
                         >
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <div className="flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
                                 {client.color && (
-                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: client.color }} />
+                                  <div className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: client.color }} />
                                 )}
-                                <h4 className="font-semibold text-gray-900">{client.name}</h4>
+                                <h4 className="truncate font-semibold text-gray-900">{client.name}</h4>
                               </div>
-                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 mt-1">
+                              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                                 {client.abbreviation && (
-                                  <span className="text-purple-600 font-semibold uppercase">{client.abbreviation}</span>
+                                  <span className="font-semibold uppercase text-purple-600">{client.abbreviation}</span>
                                 )}
                                 {client.email && <span>{client.email}</span>}
                                 {client.phone && <span>{client.phone}</span>}
                                 {client.hourly_rate != null && (
-                                  <span className="text-blue-600 font-semibold">${client.hourly_rate}/hr</span>
+                                  <span className="font-semibold text-blue-600">${client.hourly_rate}/hr</span>
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex shrink-0 items-center gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -362,29 +372,29 @@ return (
 
                   {archivedClients.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Archived</h4>
+                      <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Archived</h4>
                       <div className="space-y-3">
                         {archivedClients.map((client) => (
 <div
                             key={client.id}
-                            className="bg-gray-100 border border-gray-200 rounded-[16px] p-4 opacity-60"
+                            className="rounded-[16px] border border-gray-200 bg-gray-100 p-4 opacity-60"
                           >
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                              <div className="flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                   {client.color && (
-                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: client.color }} />
+                                    <div className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: client.color }} />
                                   )}
-                                  <h4 className="font-semibold text-gray-500">{client.name}</h4>
+                                  <h4 className="truncate font-semibold text-gray-500">{client.name}</h4>
                                 </div>
-                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 mt-1">
+                                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
                                   {client.abbreviation && (
-                                    <span className="text-purple-400 font-semibold uppercase">{client.abbreviation}</span>
+                                    <span className="font-semibold uppercase text-purple-400">{client.abbreviation}</span>
                                   )}
                                   {client.email && <span>{client.email}</span>}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex shrink-0 items-center gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"

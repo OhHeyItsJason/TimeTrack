@@ -55,9 +55,9 @@ export default function CalendarView({
 
     return (
       <div>
-        <div className="grid grid-cols-7 gap-1 mb-0.5">
+        <div className="grid grid-cols-7 gap-1 mb-0.5 md:mb-0">
             {['S', 'M', 'T', 'W', 'Tr', 'F', 'S'].map((day, index) => (
-              <div key={index} className="text-center text-xs font-semibold text-gray-500 py-0.5">
+              <div key={index} className="py-0.5 text-center text-[11px] font-semibold text-gray-500 md:py-0 md:text-[10px]">
                 {day}
               </div>
             ))}
@@ -77,14 +77,13 @@ export default function CalendarView({
             const isPaidForClient = clientStatus === 'paid';
             const isInvoicedForClient = clientStatus === 'invoiced';
             
-            const isClickable = isCurrentMonth && (
-              mode === "view" || 
-              (mode === "select" && hasWorkToday && !(isPaidForClient || isInvoicedForClient))
-            );
+            const isClickable =
+              mode === "view" ||
+              (isCurrentMonth && mode === "select" && hasWorkToday && !(isPaidForClient || isInvoicedForClient));
 
             // Determine work day styling (even for selected days to show status)
             let workDayClass = '';
-            if (hasWorkToday && isCurrentMonth) {
+            if (hasWorkToday) {
               // When selectedClientId exists (Invoice page), use that client's status
               if (selectedClientId) {
                 if (isPaidForClient) {
@@ -117,27 +116,30 @@ export default function CalendarView({
               <button
                 key={index}
                 onClick={() => isClickable && onDayClick(day)}
-                                      disabled={!isClickable}
-                                      className={`
-                                        aspect-square p-0.5 rounded-lg text-sm font-semibold transition-all relative
-                                        ${!isCurrentMonth 
-                                            ? 'text-gray-400 cursor-default' 
-                                            : isClickable 
-                                              ? 'text-gray-900 hover:bg-blue-50 cursor-pointer' 
-                                              : mode === "select" && (isPaidForClient || isInvoicedForClient)
-                                                ? 'text-gray-600 cursor-not-allowed'
-                                                : 'text-gray-500 cursor-default'}
-                                        ${isSelectedDay ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/20 border-2 border-green-400' : workDayClass || 'border border-gray-200'}
-                                      `}
+                disabled={!isClickable}
+                className={`
+                  relative aspect-square rounded-lg p-0.5 text-sm font-semibold transition-all md:rounded-[12px] md:p-0 md:text-[13px]
+                  ${!isCurrentMonth
+                    ? isClickable
+                      ? 'cursor-pointer text-gray-400 hover:bg-blue-50'
+                      : 'cursor-default text-gray-400'
+                    : isClickable
+                      ? 'cursor-pointer text-gray-900 hover:bg-blue-50'
+                      : mode === "select" && (isPaidForClient || isInvoicedForClient)
+                        ? 'cursor-not-allowed text-gray-600'
+                        : 'cursor-default text-gray-500'}
+                  ${!isCurrentMonth && !isSelectedDay ? 'opacity-75' : ''}
+                  ${isSelectedDay ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/20 border-2 border-green-400 opacity-100' : workDayClass || 'border border-gray-200'}
+                `}
               >
                 {/* Mileage indicator - top right */}
-                {hasMileageToday && isCurrentMonth && !isSelectedDay && (
-                  <div className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-sm shadow-sm shadow-amber-400/50"></div>
+                {hasMileageToday && !isSelectedDay && (
+                  <div className="absolute right-1 top-1 h-2 w-2 rounded-sm bg-amber-400 shadow-sm shadow-amber-400/50 md:right-0.5 md:top-0.5 md:h-1.5 md:w-1.5"></div>
                 )}
                 <div className="flex flex-col items-center justify-center h-full">
                   <span>{format(day, 'd')}</span>
                   {/* Client and unassigned dots */}
-                  {hasWorkToday && isCurrentMonth && !isSelectedDay && (() => {
+                  {hasWorkToday && !isSelectedDay && (() => {
                         const dayClients = clientsByDate[dateStr] || [];
                         const hasUnassigned = !!unassignedWorkByDate[dateStr];
 
@@ -146,10 +148,10 @@ export default function CalendarView({
                         }
 
                         return (
-                          <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                          <div className="mt-0.5 flex items-center justify-center gap-0.5 md:mt-0">
                             {/* Unassigned work dot - black outline only */}
                             {hasUnassigned && (
-                              <div className="w-3 h-3 rounded-full border-2 border-gray-400 bg-transparent" />
+                              <div className="h-3 w-3 rounded-full border-2 border-gray-400 bg-transparent md:h-2.5 md:w-2.5" />
                             )}
                             {/* Client dots based on status */}
                             {dayClients.slice(0, 3).map((client, idx) => {
@@ -160,7 +162,7 @@ export default function CalendarView({
                                 return (
                                   <div
                                     key={idx}
-                                    className="w-3 h-3 rounded-full border-2 bg-transparent"
+                                    className="h-3 w-3 rounded-full border-2 bg-transparent md:h-2.5 md:w-2.5"
                                     style={{ borderColor: client.color }}
                                   />
                                 );
@@ -169,7 +171,7 @@ export default function CalendarView({
                                 return (
                                   <div
                                     key={idx}
-                                    className="w-3 h-3 rounded-full"
+                                    className="h-3 w-3 rounded-full md:h-2.5 md:w-2.5"
                                     style={{ backgroundColor: client.color }}
                                   />
                                 );
@@ -178,10 +180,10 @@ export default function CalendarView({
                                 return (
                                   <div
                                     key={idx}
-                                    className="w-3 h-3 rounded-full flex items-center justify-center"
+                                    className="flex h-3 w-3 items-center justify-center rounded-full md:h-2.5 md:w-2.5"
                                     style={{ backgroundColor: client.color }}
                                   >
-                                    <Check className="w-2 h-2 text-white" strokeWidth={4} />
+                                    <Check className="h-2 w-2 text-white md:h-1.5 md:w-1.5" strokeWidth={4} />
                                   </div>
                                 );
                               }
@@ -201,7 +203,7 @@ export default function CalendarView({
   return (
     <div className="flex flex-col gap-1">
       {/* Legend */}
-                  <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-gray-600 mb-2">
+                  <div className="mb-1.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-gray-600 md:mb-1 md:gap-x-2.5 md:text-[11px]">
                       <div className="flex items-center gap-1.5">
                         <div className="w-4 h-4 rounded bg-blue-100 border-2 border-blue-400" />
                         <span>Unpaid Work</span>
@@ -221,36 +223,36 @@ export default function CalendarView({
                     </div>
 
         {/* Month Navigation */}
-                      <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center justify-between gap-3 md:gap-2.5">
                         <Button
                           variant="outline"
-                          size="default"
+                          size="sm"
                           onClick={() => onDateChange(subMonths(currentDate, 1))}
-                          className="hover:bg-blue-50 border-gray-200 text-gray-700 hover:text-blue-600 rounded-[14px] flex-shrink-0"
+                          className="h-9 flex-shrink-0 rounded-[12px] border-gray-200 px-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 md:h-8 md:px-2.5"
                         >
-                          <ChevronLeft className="w-5 h-5 mr-1" />
+                          <ChevronLeft className="mr-1 h-4 w-4" />
                           Previous
                         </Button>
 
                         <div className="text-center">
-                          <p className="text-xl font-semibold text-gray-900">
+                          <p className="text-lg font-semibold text-gray-900 md:text-base">
                             {format(displayMonth, 'MMMM yyyy')}
                           </p>
                         </div>
 
                         <Button
                           variant="outline"
-                          size="default"
+                          size="sm"
                           onClick={() => onDateChange(addMonths(currentDate, 1))}
-                          className="hover:bg-blue-50 border-gray-200 text-gray-700 hover:text-blue-600 rounded-[14px] flex-shrink-0"
+                          className="h-9 flex-shrink-0 rounded-[12px] border-gray-200 px-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 md:h-8 md:px-2.5"
                         >
                           Next
-                          <ChevronRight className="w-5 h-5 ml-1" />
+                          <ChevronRight className="ml-1 h-4 w-4" />
                         </Button>
                       </div>
 
       {/* Calendar Grid */}
-      <div className="max-w-3xl mx-auto w-full">
+      <div className="mx-auto w-full max-w-[46rem] md:max-w-[42rem]">
         {renderMonth(displayMonth)}
       </div>
     </div>

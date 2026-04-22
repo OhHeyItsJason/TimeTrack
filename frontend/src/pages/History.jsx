@@ -4,30 +4,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Clock, Eye, EyeOff, Car, FileDown } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
+import { Calendar } from "lucide-react";
+import { format } from "date-fns";
+import { motion } from "framer-motion";
 import CalendarView from "../components/history/CalendarView";
 import DayModal from "../components/history/DayModal";
-import MileageExportModal from "../components/history/MileageExportModal";
 
 export default function History() {
-  const [showEarnings, setShowEarnings] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isMileageExportOpen, setIsMileageExportOpen] = useState(false);
-  const [mileageView, setMileageView] = useState('year'); // 'week', 'month', 'year', 'prevYear'
   const queryClient = useQueryClient();
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['workSessions'],
     queryFn: () => appClient.entities.WorkSession.list('-date'),
-  });
-
-  const { data: settings = [] } = useQuery({
-    queryKey: ['settings'],
-    queryFn: () => appClient.entities.Settings.list(),
   });
 
   const { data: clients = [] } = useQuery({
@@ -44,9 +35,6 @@ export default function History() {
     queryKey: ['invoices'],
     queryFn: () => appClient.entities.Invoice.list('-start_date'),
   });
-
-  const hourlyRate = settings[0]?.hourly_rate || 50;
-
   const updateSessionMutation = useMutation({
     mutationFn: ({ id, data }) => appClient.entities.WorkSession.update(id, data),
     onSuccess: () => {
@@ -182,64 +170,6 @@ export default function History() {
       }
     });
 
-    const totalHours = workDays.reduce((sum, day) => sum + (day.totalMinutes / 60), 0).toFixed(2);
-    const totalEarnings = (totalHours * hourlyRate).toFixed(2);
-
-    // Calculate mileage date range based on view
-    const getMileageDateRange = () => {
-      const now = new Date();
-      const currentYear = now.getFullYear();
-
-      switch (mileageView) {
-        case 'week': {
-          const startOfWeek = new Date(now);
-          startOfWeek.setDate(now.getDate() - now.getDay());
-          const endOfWeek = new Date(startOfWeek);
-          endOfWeek.setDate(startOfWeek.getDate() + 6);
-          return {
-            start: format(startOfWeek, 'yyyy-MM-dd'),
-            end: format(endOfWeek, 'yyyy-MM-dd'),
-            label: 'This Week'
-          };
-        }
-        case 'month': {
-          const start = format(startOfMonth(now), 'yyyy-MM-dd');
-          const end = format(endOfMonth(now), 'yyyy-MM-dd');
-          return {
-            start,
-            end,
-            label: format(now, 'MMMM yyyy')
-          };
-        }
-        case 'prevYear': {
-          return {
-            start: `${currentYear - 1}-01-01`,
-            end: `${currentYear - 1}-12-31`,
-            label: `${currentYear - 1}`
-          };
-        }
-        case 'year':
-        default: {
-          return {
-            start: `${currentYear}-01-01`,
-            end: `${currentYear}-12-31`,
-            label: `${currentYear}`
-          };
-        }
-      }
-    };
-
-    const mileageDateRange = getMileageDateRange();
-
-    // Calculate total mileage from day records only
-    const totalMileage = dayMileageRecords
-      .filter(d => d.date >= mileageDateRange.start && d.date <= mileageDateRange.end)
-      .reduce((sum, d) => {
-        const miles = d.daily_miles_driven || 0;
-        const multiplier = d.daily_round_trip ? 2 : 1;
-        return sum + (miles * multiplier);
-      }, 0);
-
   const handleDayClick = (date) => {
     setSelectedDate(date);
     setIsModalOpen(true);
@@ -324,26 +254,8 @@ return (
               <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 mb-2">
                 Work History
               </h1>
-              <p className="text-gray-500 text-lg">Review your work hours and earnings</p>
+              <p className="text-gray-500 text-lg">Review and edit your recorded work days</p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowEarnings(!showEarnings)}
-              className="gap-2 border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-blue-600 rounded-[14px]"
-            >
-              {showEarnings ? (
-                <>
-                  <EyeOff className="w-4 h-4" />
-                  Hide Earnings
-                </>
-              ) : (
-                <>
-                  <Eye className="w-4 h-4" />
-                  Show Earnings
-                </>
-              )}
-            </Button>
           </div>
         </motion.div>
 
@@ -376,126 +288,6 @@ return (
           </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-<div className={`grid gap-6 ${showEarnings ? 'md:grid-cols-2' : ''}`}>
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[28px]">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <Clock className="w-5 h-5 text-blue-600" />
-                  <p className="text-sm text-blue-600 font-semibold tracking-wide uppercase">Total Hours</p>
-                </div>
-                <p className="text-5xl font-bold text-blue-600">
-                  {totalHours}
-                </p>
-                <p className="text-sm text-blue-600 mt-2 font-medium">{workDays.length} work days</p>
-              </CardContent>
-            </Card>
-
-            <AnimatePresence>
-              {showEarnings && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Card className="shadow-lg border-0 bg-gradient-to-br from-green-50 to-emerald-50 rounded-[28px]">
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Calendar className="w-5 h-5 text-green-600" />
-                        <p className="text-sm text-green-600 font-semibold tracking-wide uppercase">Total Earnings</p>
-                      </div>
-                      <p className="text-5xl font-bold text-green-600">
-                        ${totalEarnings}
-                      </p>
-                      <p className="text-sm text-green-600 mt-2 font-medium">at ${hourlyRate}/hr</p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-
-{/* Mileage Summary Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-6"
-        >
-<Card className="shadow-lg border-0 bg-gradient-to-br from-amber-50 to-orange-50 rounded-[28px]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <Car className="w-5 h-5 text-amber-600" />
-                  <p className="text-sm text-amber-600 font-semibold tracking-wide uppercase">Total Mileage</p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsMileageExportOpen(true)}
-                  className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-100 rounded-[14px]"
-                >
-                  <FileDown className="w-4 h-4" />
-                  Export
-                </Button>
-              </div>
-              <p className="text-5xl font-bold text-amber-600">
-                {totalMileage.toFixed(1)}
-              </p>
-              <p className="text-sm text-amber-600 mt-2 font-medium">{mileageDateRange.label}</p>
-              
-              <div className="flex gap-2 mt-4">
-                <Button
-                  variant={mileageView === 'week' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMileageView('week')}
-                  className={mileageView === 'week' 
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white rounded-[12px] text-xs' 
-                    : 'border-amber-200 text-amber-700 hover:bg-amber-100 rounded-[12px] text-xs'}
-                >
-                  Week
-                </Button>
-                <Button
-                  variant={mileageView === 'month' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMileageView('month')}
-                  className={mileageView === 'month' 
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white rounded-[12px] text-xs' 
-                    : 'border-amber-200 text-amber-700 hover:bg-amber-100 rounded-[12px] text-xs'}
-                >
-                  Month
-                </Button>
-                <Button
-                  variant={mileageView === 'year' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMileageView('year')}
-                  className={mileageView === 'year' 
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white rounded-[12px] text-xs' 
-                    : 'border-amber-200 text-amber-700 hover:bg-amber-100 rounded-[12px] text-xs'}
-                >
-                  Year
-                </Button>
-                <Button
-                  variant={mileageView === 'prevYear' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMileageView('prevYear')}
-                  className={mileageView === 'prevYear' 
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white rounded-[12px] text-xs' 
-                    : 'border-amber-200 text-amber-700 hover:bg-amber-100 rounded-[12px] text-xs'}
-                >
-                  Prev Year
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
 <DayModal
           date={selectedDate}
           sessions={getSessionsForDate(selectedDate)}
@@ -504,12 +296,6 @@ return (
           isOpen={isModalOpen}
           clients={clients}
           onUpdateSessionClient={handleUpdateSessionClient}
-        />
-
-<MileageExportModal
-          isOpen={isMileageExportOpen}
-          onClose={() => setIsMileageExportOpen(false)}
-          dayMileageRecords={dayMileageRecords}
         />
       </div>
     </div>

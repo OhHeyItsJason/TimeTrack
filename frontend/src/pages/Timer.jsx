@@ -19,7 +19,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Play, Square, Clock, CheckCircle, List, Plus, Users, Edit2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
+import { Play, Square, Clock, CheckCircle, List, Plus, Users, Edit2, Trash2 } from "lucide-react";
 
 import { format } from "date-fns";
 import { motion } from "framer-motion";
@@ -34,6 +37,14 @@ const [selectedClientId, setSelectedClientId] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [editingStartTime, setEditingStartTime] = useState(false);
   const [newStartTime, setNewStartTime] = useState("");
+  const [editingCompletedSession, setEditingCompletedSession] = useState(null);
+  const [editingCompletedStartTime, setEditingCompletedStartTime] = useState("");
+  const [editingCompletedEndTime, setEditingCompletedEndTime] = useState("");
+  const [editingCompletedClientId, setEditingCompletedClientId] = useState("");
+  const [editingCompletedMilesDriven, setEditingCompletedMilesDriven] = useState("");
+  const [editingCompletedRoundTrip, setEditingCompletedRoundTrip] = useState(false);
+  const [editingCompletedMileageNotes, setEditingCompletedMileageNotes] = useState("");
+  const [sessionPendingDelete, setSessionPendingDelete] = useState(null);
 
   const { data: allSessions = [] } = useQuery({
     queryKey: ['workSessions'],
@@ -47,7 +58,7 @@ const [selectedClientId, setSelectedClientId] = useState("");
   });
 
   const todaySessions = allSessions.filter(s => s.date === today);
-  const activeSession = todaySessions.find(s => s.is_active);
+  const activeSession = allSessions.find(s => s.is_active);
   const isActive = !!activeSession;
   
   const totalMinutes = todaySessions.reduce((sum, session) => {
@@ -91,19 +102,34 @@ const [selectedClientId, setSelectedClientId] = useState("");
     },
   });
 
+  const deleteSessionMutation = useMutation({
+    mutationFn: (id) => appClient.entities.WorkSession.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workSessions'] });
+    },
+  });
+
   const handleStart = async () => {
     if (!selectedClientId) {
       setShowNoClientDialog(true);
       return;
     }
     const now = new Date();
-    await createSessionMutation.mutateAsync({
-      date: today,
-      start_time: now.toISOString(),
-      duration_minutes: 0,
-      is_active: true,
-      client_id: selectedClientId,
-    });
+    try {
+      await createSessionMutation.mutateAsync({
+        date: today,
+        start_time: now.toISOString(),
+        duration_minutes: 0,
+        is_active: true,
+        client_id: selectedClientId,
+      });
+    } catch (error) {
+      toast({
+        title: "Unable to start timer",
+        description: error?.message || "The timer could not be started.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSaveClient = async (clientData, clientId) => {
@@ -128,6 +154,96 @@ const [selectedClientId, setSelectedClientId] = useState("");
     }
   };
 
+  const calculateSessionMinutes = (startTime, endTime) => {
+    if (!startTime || !endTime) return 0;
+
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
+
+    const startTotal = startHour * 60 + startMinute;
+    const endTotal = endHour * 60 + endMinute;
+
+    let totalMinutes = endTotal - startTotal;
+    if (totalMinutes < 0) {
+      totalMinutes += 24 * 60;
+    }
+
+    return totalMinutes;
+  };
+
+  const handleEditCompletedSession = (session) => {
+    setEditingCompletedSession(session);
+    setEditingCompletedStartTime(format(new Date(session.start_time), 'HH:mm'));
+    setEditingCompletedEndTime(format(new Date(session.end_time), 'HH:mm'));
+    setEditingCompletedClientId(session.client_id || "");
+    setEditingCompletedMilesDriven(
+      session.session_miles_driven != null ? String(session.session_miles_driven) : ""
+    );
+    setEditingCompletedRoundTrip(Boolean(session.session_round_trip));
+    setEditingCompletedMileageNotes(session.session_mileage_notes || "");
+  };
+
+  const handleSaveCompletedSession = async () => {
+    if (!editingCompletedSession || !editingCompletedStartTime || !editingCompletedEndTime) {
+      return;
+    }
+
+    const sessionDate = editingCompletedSession.date || format(new Date(editingCompletedSession.start_time), 'yyyy-MM-dd');
+    const startDate = new Date(`${sessionDate}T${editingCompletedStartTime}:00`);
+    const endDate = new Date(`${sessionDate}T${editingCompletedEndTime}:00`);
+    const durationMinutes = calculateSessionMinutes(editingCompletedStartTime, editingCompletedEndTime);
+
+    if (endDate < startDate) {
+      endDate.setDate(endDate.getDate() + 1);
+    }
+
+    try {
+      await updateSessionMutation.mutateAsync({
+        id: editingCompletedSession.id,
+        data: {
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          duration_minutes: durationMinutes,
+          client_id: editingCompletedClientId || null,
+          session_miles_driven: parseFloat(editingCompletedMilesDriven) || 0,
+          session_round_trip: editingCompletedRoundTrip,
+          session_mileage_notes: editingCompletedMileageNotes.trim() || null,
+        },
+      });
+      setEditingCompletedSession(null);
+      setEditingCompletedStartTime("");
+      setEditingCompletedEndTime("");
+      setEditingCompletedClientId("");
+      setEditingCompletedMilesDriven("");
+      setEditingCompletedRoundTrip(false);
+      setEditingCompletedMileageNotes("");
+    } catch (error) {
+      toast({
+        title: "Unable to update session",
+        description: error?.message || "The completed session could not be updated.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteCompletedSession = async () => {
+    if (!sessionPendingDelete) return;
+
+    try {
+      await deleteSessionMutation.mutateAsync(sessionPendingDelete.id);
+      setSessionPendingDelete(null);
+      if (editingCompletedSession?.id === sessionPendingDelete.id) {
+        setEditingCompletedSession(null);
+      }
+    } catch (error) {
+      toast({
+        title: "Unable to delete session",
+        description: error?.message || "The completed session could not be deleted.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSaveStartTime = async () => {
     if (!activeSession || !newStartTime) return;
     
@@ -135,14 +251,21 @@ const [selectedClientId, setSelectedClientId] = useState("");
     const startDate = new Date(activeSession.start_time);
     startDate.setHours(hours, minutes, 0, 0);
     
-    await updateSessionMutation.mutateAsync({
-      id: activeSession.id,
-      data: {
-        start_time: startDate.toISOString(),
-      },
-    });
-    
-    setEditingStartTime(false);
+    try {
+      await updateSessionMutation.mutateAsync({
+        id: activeSession.id,
+        data: {
+          start_time: startDate.toISOString(),
+        },
+      });
+      setEditingStartTime(false);
+    } catch (error) {
+      toast({
+        title: "Unable to update start time",
+        description: error?.message || "The session start time could not be updated.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Get active session's client name
@@ -156,18 +279,29 @@ const handleStop = async () => {
     const now = new Date();
     const startTime = new Date(activeSession.start_time);
     const sessionMinutes = (now - startTime) / 1000 / 60;
-    
-    await updateSessionMutation.mutateAsync({
-      id: activeSession.id,
-      data: {
-        is_active: false,
-        end_time: now.toISOString(),
-        duration_minutes: Math.round(sessionMinutes * 100) / 100,
-      },
-    });
+
+    try {
+      await updateSessionMutation.mutateAsync({
+        id: activeSession.id,
+        data: {
+          is_active: false,
+          end_time: now.toISOString(),
+          duration_minutes: Math.round(sessionMinutes * 100) / 100,
+        },
+      });
+    } catch (error) {
+      toast({
+        title: "Unable to stop timer",
+        description: error?.message || "The active session could not be stopped.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const isLoading = createSessionMutation.isPending || updateSessionMutation.isPending;
+  const isLoading =
+    createSessionMutation.isPending ||
+    updateSessionMutation.isPending ||
+    deleteSessionMutation.isPending;
 
   const completedSessions = todaySessions
     .filter(s => {
@@ -189,6 +323,50 @@ return (
             Timer
           </h1>
           <p className="text-gray-500 text-lg">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+        >
+<Card className="mb-4 border-0 bg-white/78 shadow-md ios-blur rounded-[24px]">
+            <CardContent className="p-4 md:p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-600">
+                    Today's Total
+                  </p>
+                  <div className="mt-1 flex items-end gap-2">
+                    <p className="text-4xl md:text-5xl font-bold leading-none text-gray-900">
+                      {totalHours}
+                    </p>
+                    <p className="pb-1 text-sm font-medium text-gray-500">
+                      hours
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    {completedSessions.length} recorded session{completedSessions.length !== 1 ? 's' : ''}
+                    {isActive ? ' plus an active timer' : ''}
+                  </p>
+                </div>
+
+                {clientTotalsArray.length > 0 && (
+                  <div className="flex max-w-[52%] flex-wrap justify-end gap-2">
+                    {clientTotalsArray.map((ct) => (
+                      <span
+                        key={ct.clientId}
+                        className="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+                        style={{ backgroundColor: ct.color }}
+                      >
+                        {ct.name} • {ct.hours}h
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         <motion.div
@@ -311,53 +489,6 @@ return (
           </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-<Card className="shadow-lg border-0 bg-white/80 ios-blur rounded-[28px]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-900">
-                <Clock className="w-5 h-5 text-blue-600" />
-                Today's Total
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[20px] p-8 text-center border border-blue-100 shadow-sm">
-                <p className="text-sm text-blue-600 font-semibold mb-2 uppercase tracking-wide">Hours Worked</p>
-                <p className="text-7xl font-bold text-blue-600">
-                  {totalHours}
-                </p>
-                {completedSessions.length > 0 && (
-                  <p className="text-sm text-blue-600 mt-3 font-medium">
-                    {completedSessions.length} session{completedSessions.length !== 1 ? 's' : ''}
-                  </p>
-                )}
-                {clientTotalsArray.length > 0 && (
-                  <div className="flex flex-wrap justify-center gap-2 mt-4">
-                    {clientTotalsArray.map((ct) => (
-                      <span
-                        key={ct.clientId}
-                        className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium text-white shadow-sm"
-                        style={{ backgroundColor: ct.color }}
-                      >
-                        {ct.name} • {ct.hours}h
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              {totalHours !== "0.00" && (
-                <div className="mt-4 text-center text-sm text-gray-500">
-                  <p>Keep up the great work! 💪</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
         {completedSessions.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -378,6 +509,10 @@ return (
                     const hours = (session.duration_minutes / 60).toFixed(2);
                     const startDate = new Date(session.start_time);
                     const endDate = new Date(session.end_time);
+                    const sessionClient = session.client_id
+                      ? clients.find((client) => client.id === session.client_id)
+                      : null;
+                    const totalSessionMiles = (session.session_miles_driven || 0) * (session.session_round_trip ? 2 : 1);
                     
                     return (
                       <div 
@@ -393,7 +528,33 @@ return (
                               {format(startDate, 'h:mm a')} - {format(endDate, 'h:mm a')}
                             </p>
                             <p className="text-sm text-gray-500">{hours}h</p>
+                            {sessionClient && (
+                              <p className="text-sm text-gray-500">{sessionClient.name}</p>
+                            )}
+                            {totalSessionMiles > 0 && (
+                              <p className="text-sm text-amber-600">
+                                {totalSessionMiles.toFixed(1)} miles{session.session_round_trip ? " round trip" : ""}
+                              </p>
+                            )}
                           </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditCompletedSession(session)}
+                            className="h-10 w-10 rounded-[14px] text-purple-600 hover:bg-purple-50 hover:text-purple-700"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSessionPendingDelete(session)}
+                            className="h-10 w-10 rounded-[14px] text-red-600 hover:bg-red-50 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     );
@@ -459,6 +620,167 @@ return (
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-[14px]"
             >
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!editingCompletedSession}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingCompletedSession(null);
+            setEditingCompletedMilesDriven("");
+            setEditingCompletedRoundTrip(false);
+            setEditingCompletedMileageNotes("");
+          }
+        }}
+      >
+        <DialogContent className="bg-white border-0 rounded-[24px] shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900">Edit Session</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="completedSessionClient" className="text-gray-700">Client</Label>
+              <Select value={editingCompletedClientId} onValueChange={setEditingCompletedClientId}>
+                <SelectTrigger id="completedSessionClient" className="bg-white border-gray-200 text-gray-900 h-12 rounded-[14px]">
+                  <SelectValue placeholder="No client" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200 rounded-[16px]">
+                  {clients.filter(c => !c.is_archived).map((client) => (
+                    <SelectItem key={client.id} value={client.id} className="text-gray-900 rounded-[12px]">
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="completedStartTime" className="text-gray-700">Start Time</Label>
+                <Input
+                  id="completedStartTime"
+                  type="time"
+                  value={editingCompletedStartTime}
+                  onChange={(e) => setEditingCompletedStartTime(e.target.value)}
+                  className="bg-white border-gray-200 text-gray-900 rounded-[14px] h-12"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="completedEndTime" className="text-gray-700">End Time</Label>
+                <Input
+                  id="completedEndTime"
+                  type="time"
+                  value={editingCompletedEndTime}
+                  onChange={(e) => setEditingCompletedEndTime(e.target.value)}
+                  className="bg-white border-gray-200 text-gray-900 rounded-[14px] h-12"
+                />
+              </div>
+            </div>
+            <div className="rounded-[18px] border border-amber-200 bg-amber-50/60 p-4 space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-amber-700">Mileage</p>
+                <p className="text-xs text-amber-700/80">Optional mileage for this session only.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="completedSessionMiles" className="text-gray-700">Miles Driven</Label>
+                <Input
+                  id="completedSessionMiles"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={editingCompletedMilesDriven}
+                  onChange={(e) => setEditingCompletedMilesDriven(e.target.value)}
+                  className="bg-white border-gray-200 text-gray-900 rounded-[14px] h-12"
+                  placeholder="0.0"
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-[14px] bg-white px-4 py-3 border border-amber-100">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Round trip</p>
+                  <p className="text-xs text-gray-500">Double the entered miles for this session.</p>
+                </div>
+                <Switch
+                  checked={editingCompletedRoundTrip}
+                  onCheckedChange={setEditingCompletedRoundTrip}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="completedSessionMileageNotes" className="text-gray-700">Mileage Notes</Label>
+                <Textarea
+                  id="completedSessionMileageNotes"
+                  value={editingCompletedMileageNotes}
+                  onChange={(e) => setEditingCompletedMileageNotes(e.target.value)}
+                  className="bg-white border-gray-200 text-gray-900 rounded-[14px] min-h-24"
+                  placeholder="Optional notes about this trip"
+                />
+              </div>
+              <p className="text-sm text-amber-700">
+                Session mileage total: {((parseFloat(editingCompletedMilesDriven) || 0) * (editingCompletedRoundTrip ? 2 : 1)).toFixed(1)} miles
+              </p>
+            </div>
+            {editingCompletedStartTime && editingCompletedEndTime && (
+              <p className="text-sm text-gray-500">
+                Duration: {(calculateSessionMinutes(editingCompletedStartTime, editingCompletedEndTime) / 60).toFixed(2)}h
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditingCompletedSession(null)}
+              className="border-gray-200 text-gray-700 hover:bg-gray-100 rounded-[14px]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveCompletedSession}
+              disabled={!editingCompletedStartTime || !editingCompletedEndTime || isLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-[14px]"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!sessionPendingDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSessionPendingDelete(null);
+          }
+        }}
+      >
+        <DialogContent className="bg-white border-0 rounded-[24px] shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900">Delete Session?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-gray-600">
+              Are you sure you want to delete this session? This action cannot be undone.
+            </p>
+            {sessionPendingDelete && (
+              <div className="rounded-[16px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+                {format(new Date(sessionPendingDelete.start_time), 'h:mm a')} - {format(new Date(sessionPendingDelete.end_time), 'h:mm a')}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSessionPendingDelete(null)}
+              className="border-gray-200 text-gray-700 hover:bg-gray-100 rounded-[14px]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteCompletedSession}
+              disabled={deleteSessionMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white rounded-[14px]"
+            >
+              Delete Session
             </Button>
           </DialogFooter>
         </DialogContent>
