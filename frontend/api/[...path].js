@@ -168,14 +168,19 @@ async function deleteEntityRow(db, entity, userId, id) {
   return existing;
 }
 
-function validateEntityRules(entity, rows, payload, userId, mode, currentId) {
+function validateEntityRules(entity, rows, payload, userId, mode, currentId, existingRow = null) {
   if (entity === 'Settings') {
     if (mode === 'create' && rows.some((r) => r.created_by === userId)) {
       return 'Only one Settings record is allowed per user.';
     }
   }
   if (entity === 'WorkSession') {
-    if (payload.is_active === true) {
+    const isActivating =
+      mode === 'create'
+        ? payload.is_active === true
+        : payload.is_active === true && !existingRow?.is_active;
+
+    if (isActivating) {
       if (rows.some((r) => r.created_by === userId && r.is_active && r.id !== currentId)) {
         return 'Only one active work session is allowed per user.';
       }
@@ -338,7 +343,7 @@ export default async function handler(req, res) {
       const payload = req.body || {};
       const next = { ...existing, ...payload, updated_date: nowIso() };
       const rowsForValidation = await loadEntityRows(db, entity, userId, '');
-      const violation = validateEntityRules(entity, rowsForValidation, next, userId, 'update', id);
+      const violation = validateEntityRules(entity, rowsForValidation, next, userId, 'update', id, existing);
       if (violation) { sendJson(res, 400, { error: violation }); return; }
       const updated = await updateEntityRow(db, entity, userId, id, payload);
       sendJson(res, 200, updated);
