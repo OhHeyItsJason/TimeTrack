@@ -44,6 +44,7 @@ const [selectedClientId, setSelectedClientId] = useState("");
   const [editingCompletedMilesDriven, setEditingCompletedMilesDriven] = useState("");
   const [editingCompletedRoundTrip, setEditingCompletedRoundTrip] = useState(false);
   const [editingCompletedMileageNotes, setEditingCompletedMileageNotes] = useState("");
+  const [endingAction, setEndingAction] = useState(null);
   const [sessionPendingDelete, setSessionPendingDelete] = useState(null);
 
   const { data: allSessions = [] } = useQuery({
@@ -172,6 +173,7 @@ const [selectedClientId, setSelectedClientId] = useState("");
   };
 
   const handleEditCompletedSession = (session) => {
+    setEndingAction(null);
     setEditingCompletedSession(session);
     setEditingCompletedStartTime(format(new Date(session.start_time), 'HH:mm'));
     setEditingCompletedEndTime(format(new Date(session.end_time), 'HH:mm'));
@@ -181,6 +183,32 @@ const [selectedClientId, setSelectedClientId] = useState("");
     );
     setEditingCompletedRoundTrip(Boolean(session.session_round_trip));
     setEditingCompletedMileageNotes(session.session_mileage_notes || "");
+  };
+
+  const resetSessionEditor = () => {
+    setEditingCompletedSession(null);
+    setEditingCompletedStartTime("");
+    setEditingCompletedEndTime("");
+    setEditingCompletedClientId("");
+    setEditingCompletedMilesDriven("");
+    setEditingCompletedRoundTrip(false);
+    setEditingCompletedMileageNotes("");
+    setEndingAction(null);
+  };
+
+  const handleOpenEndSession = (action) => {
+    if (!activeSession) return;
+
+    setEndingAction(action);
+    setEditingCompletedSession(activeSession);
+    setEditingCompletedStartTime(format(new Date(activeSession.start_time), 'HH:mm'));
+    setEditingCompletedEndTime(format(new Date(), 'HH:mm'));
+    setEditingCompletedClientId(activeSession.client_id || "");
+    setEditingCompletedMilesDriven(
+      activeSession.session_miles_driven != null ? String(activeSession.session_miles_driven) : ""
+    );
+    setEditingCompletedRoundTrip(Boolean(activeSession.session_round_trip));
+    setEditingCompletedMileageNotes(activeSession.session_mileage_notes || "");
   };
 
   const handleSaveCompletedSession = async () => {
@@ -198,25 +226,25 @@ const [selectedClientId, setSelectedClientId] = useState("");
     }
 
     try {
+      const sessionUpdate = {
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
+        duration_minutes: durationMinutes,
+        client_id: editingCompletedClientId || null,
+        session_miles_driven: parseFloat(editingCompletedMilesDriven) || 0,
+        session_round_trip: editingCompletedRoundTrip,
+        session_mileage_notes: editingCompletedMileageNotes.trim() || null,
+      };
+
+      if (endingAction) {
+        sessionUpdate.is_active = false;
+      }
+
       await updateSessionMutation.mutateAsync({
         id: editingCompletedSession.id,
-        data: {
-          start_time: startDate.toISOString(),
-          end_time: endDate.toISOString(),
-          duration_minutes: durationMinutes,
-          client_id: editingCompletedClientId || null,
-          session_miles_driven: parseFloat(editingCompletedMilesDriven) || 0,
-          session_round_trip: editingCompletedRoundTrip,
-          session_mileage_notes: editingCompletedMileageNotes.trim() || null,
-        },
+        data: sessionUpdate,
       });
-      setEditingCompletedSession(null);
-      setEditingCompletedStartTime("");
-      setEditingCompletedEndTime("");
-      setEditingCompletedClientId("");
-      setEditingCompletedMilesDriven("");
-      setEditingCompletedRoundTrip(false);
-      setEditingCompletedMileageNotes("");
+      resetSessionEditor();
     } catch (error) {
       toast({
         title: "Unable to update session",
@@ -272,31 +300,6 @@ const [selectedClientId, setSelectedClientId] = useState("");
   const activeClient = activeSession?.client_id 
     ? clients.find(c => c.id === activeSession.client_id) 
     : null;
-
-const handleStop = async () => {
-    if (!activeSession) return;
-    
-    const now = new Date();
-    const startTime = new Date(activeSession.start_time);
-    const sessionMinutes = (now - startTime) / 1000 / 60;
-
-    try {
-      await updateSessionMutation.mutateAsync({
-        id: activeSession.id,
-        data: {
-          is_active: false,
-          end_time: now.toISOString(),
-          duration_minutes: Math.round(sessionMinutes * 100) / 100,
-        },
-      });
-    } catch (error) {
-      toast({
-        title: "Unable to stop timer",
-        description: error?.message || "The active session could not be stopped.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const isLoading =
     createSessionMutation.isPending ||
@@ -467,7 +470,7 @@ return (
               ) : (
                 <div className="space-y-3">
                     <Button
-                      onClick={handleStop}
+                      onClick={() => handleOpenEndSession('End Session')}
                       disabled={isLoading}
                       variant="outline"
                       className="w-full h-16 border-2 border-orange-300 text-orange-600 hover:bg-orange-50 text-lg font-semibold rounded-[16px] bg-white"
@@ -476,7 +479,7 @@ return (
                       Stop Session
                     </Button>
                     <Button
-                      onClick={handleStop}
+                      onClick={() => handleOpenEndSession('End Day')}
                       disabled={isLoading}
                       className="w-full h-16 bg-gray-800 hover:bg-gray-900 text-white text-lg font-semibold shadow-lg rounded-[16px]"
                     >
@@ -629,16 +632,13 @@ return (
         open={!!editingCompletedSession}
         onOpenChange={(open) => {
           if (!open) {
-            setEditingCompletedSession(null);
-            setEditingCompletedMilesDriven("");
-            setEditingCompletedRoundTrip(false);
-            setEditingCompletedMileageNotes("");
+            resetSessionEditor();
           }
         }}
       >
         <DialogContent className="bg-white border-0 rounded-[24px] shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-gray-900">Edit Session</DialogTitle>
+            <DialogTitle className="text-gray-900">{endingAction || 'Edit Session'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -729,7 +729,7 @@ return (
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setEditingCompletedSession(null)}
+              onClick={resetSessionEditor}
               className="border-gray-200 text-gray-700 hover:bg-gray-100 rounded-[14px]"
             >
               Cancel
@@ -739,7 +739,7 @@ return (
               disabled={!editingCompletedStartTime || !editingCompletedEndTime || isLoading}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-[14px]"
             >
-              Save
+              {endingAction || 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
