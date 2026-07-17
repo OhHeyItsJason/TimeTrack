@@ -25,6 +25,7 @@ export default function InvoiceHistory() {
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [invoiceToEdit, setInvoiceToEdit] = useState(null);
+  const [statusChangeConfirmation, setStatusChangeConfirmation] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: invoices = [], isLoading } = useQuery({
@@ -55,6 +56,11 @@ export default function InvoiceHistory() {
 
   const handleToggleSubmitted = async (invoice) => {
     const isSubmitting = !invoice.is_submitted;
+    if (!isSubmitting) {
+      setStatusChangeConfirmation({ invoice, status: 'submitted' });
+      return;
+    }
+
     await updateInvoiceMutation.mutateAsync({
       id: invoice.id,
       data: {
@@ -66,6 +72,11 @@ export default function InvoiceHistory() {
 
   const handleTogglePaid = async (invoice) => {
     const isPaying = !invoice.is_paid;
+    if (!isPaying) {
+      setStatusChangeConfirmation({ invoice, status: 'paid' });
+      return;
+    }
+
     await updateInvoiceMutation.mutateAsync({
       id: invoice.id,
       data: {
@@ -144,6 +155,19 @@ export default function InvoiceHistory() {
     if (invoiceToDelete) {
       await deleteInvoiceMutation.mutateAsync(invoiceToDelete.id);
     }
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (!statusChangeConfirmation) return;
+
+    const { invoice, status } = statusChangeConfirmation;
+    await updateInvoiceMutation.mutateAsync({
+      id: invoice.id,
+      data: status === 'submitted'
+        ? { is_submitted: false, submitted_date: null }
+        : { is_paid: false, paid_date: null },
+    });
+    setStatusChangeConfirmation(null);
   };
 
   const handleEditClick = (invoice) => {
@@ -340,6 +364,7 @@ if (isLoading) {
                               size="sm"
                               onClick={() => handleToggleSubmitted(invoice)}
                               className={invoice.is_submitted ? "bg-blue-600 hover:bg-blue-700 text-white rounded-[14px]" : "border-gray-200 text-gray-700 hover:bg-gray-100 rounded-[14px]"}
+                              title={invoice.is_submitted ? "Mark unsubmitted" : "Mark submitted"}
                             >
                               <Send className="w-4 h-4" />
                             </Button>
@@ -349,6 +374,7 @@ if (isLoading) {
                               size="sm"
                               onClick={() => handleTogglePaid(invoice)}
                               className="text-green-600 hover:bg-green-50 border-gray-200 rounded-[14px]"
+                              title="Mark paid"
                             >
                               <DollarSign className="w-4 h-4" />
                             </Button>
@@ -436,6 +462,7 @@ if (isLoading) {
                               size="sm"
                               onClick={() => handleTogglePaid(invoice)}
                               className="text-orange-600 hover:bg-orange-50 border-gray-200 rounded-[14px]"
+                              title="Mark unpaid"
                             >
                               Mark Unpaid
                             </Button>
@@ -488,6 +515,75 @@ if (isLoading) {
             }
           }}
         />
+
+        <Dialog
+          open={!!statusChangeConfirmation}
+          onOpenChange={(open) => !open && setStatusChangeConfirmation(null)}
+        >
+          <DialogContent className="border-0 bg-white shadow-2xl sm:max-w-md sm:rounded-[24px]">
+            {statusChangeConfirmation && (() => {
+              const { invoice, status } = statusChangeConfirmation;
+              const isUnsubmitting = status === 'submitted';
+              const statusDate = isUnsubmitting ? invoice.submitted_date : invoice.paid_date;
+              const actionLabel = isUnsubmitting ? 'Mark Invoice Unsubmitted?' : 'Mark Invoice Unpaid?';
+              const keepLabel = isUnsubmitting ? 'Keep Submitted' : 'Keep Paid';
+              const confirmLabel = isUnsubmitting ? 'Mark Unsubmitted' : 'Mark Unpaid';
+              const statusLabel = isUnsubmitting ? 'Submitted' : 'Paid';
+
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="text-gray-900">{actionLabel}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <p className="text-gray-600">
+                      {isUnsubmitting
+                        ? `This will return ${invoice.invoice_number} to draft status and clear its submitted date.`
+                        : `This will move ${invoice.invoice_number} back to open invoices and clear its paid date.`}
+                    </p>
+                    <div className={`rounded-[16px] border p-4 ${
+                      isUnsubmitting ? 'border-blue-100 bg-blue-50/60' : 'border-green-100 bg-green-50/60'
+                    }`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`flex h-10 w-10 flex-none items-center justify-center rounded-[12px] ${
+                          isUnsubmitting ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
+                        }`}>
+                          {isUnsubmitting ? <FileText className="h-5 w-5" /> : <DollarSign className="h-5 w-5" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900">{invoice.client_name}</p>
+                          <p className="text-sm text-gray-600">{invoice.invoice_number} · ${invoice.total_amount.toFixed(2)}</p>
+                          <p className={`mt-2 text-sm font-medium ${isUnsubmitting ? 'text-blue-700' : 'text-green-700'}`}>
+                            {statusLabel}: {formatStatusDate(statusDate)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setStatusChangeConfirmation(null)}
+                      disabled={updateInvoiceMutation.isPending}
+                      className="rounded-[14px] border-gray-200 text-gray-700 hover:bg-gray-100"
+                    >
+                      {keepLabel}
+                    </Button>
+                    <Button
+                      onClick={handleConfirmStatusChange}
+                      disabled={updateInvoiceMutation.isPending}
+                      className={isUnsubmitting
+                        ? 'rounded-[14px] bg-blue-600 text-white hover:bg-blue-700'
+                        : 'rounded-[14px] border border-orange-500 bg-white text-orange-600 hover:bg-orange-50'}
+                    >
+                      {updateInvoiceMutation.isPending ? 'Updating...' : confirmLabel}
+                    </Button>
+                  </DialogFooter>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
 
         <EditInvoiceModal
           isOpen={isEditOpen}
