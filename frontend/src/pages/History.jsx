@@ -37,9 +37,6 @@ export default function History() {
   });
   const updateSessionMutation = useMutation({
     mutationFn: ({ id, data }) => appClient.entities.WorkSession.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workSessions'] });
-    },
   });
 
   const createSessionMutation = useMutation({
@@ -54,6 +51,14 @@ export default function History() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workSessions'] });
     },
+  });
+
+  const createDayMileageMutation = useMutation({
+    mutationFn: (data) => appClient.entities.DayMileage.create(data),
+  });
+
+  const updateDayMileageMutation = useMutation({
+    mutationFn: ({ id, data }) => appClient.entities.DayMileage.update(id, data),
   });
 
   const daysByDate = sessions.reduce((acc, session) => {
@@ -175,39 +180,54 @@ export default function History() {
     setIsModalOpen(true);
   };
 
-  const handleSaveHours = async (sessionsData) => {
+  const handleSaveDay = async ({ sessions: sessionsData, mileage }) => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const existingDay = daysByDate[dateStr];
-    
-    // Delete existing sessions for this day
-    if (existingDay && existingDay.sessions && existingDay.sessions.length > 0) {
-      const deletePromises = existingDay.sessions.map(async (session) => {
-        if (session.id) {
-          try {
-            await deleteSessionMutation.mutateAsync(session.id);
-          } catch (error) {
-            console.error(`Failed to delete session ${session.id}:`, error);
-          }
+
+    const persistSessions = async () => {
+      const existingSessions = existingDay?.sessions || [];
+      const existingIds = new Set(existingSessions.map((session) => session.id));
+      const savedIds = new Set((sessionsData || []).map((session) => session.id).filter(Boolean));
+
+      await Promise.all(existingSessions
+        .filter((session) => !savedIds.has(session.id))
+        .map((session) => deleteSessionMutation.mutateAsync(session.id))
+      );
+
+      await Promise.all((sessionsData || []).map((sessionData) => {
+        const { id, ...data } = sessionData;
+        if (id && existingIds.has(id)) {
+          return updateSessionMutation.mutateAsync({ id, data });
         }
-      });
-      
-      await Promise.all(deletePromises);
-    }
-    
-    // Create new sessions if provided
-    if (sessionsData && sessionsData.length > 0) {
-      const createPromises = sessionsData.map(async (sessionData) => {
-        await createSessionMutation.mutateAsync({
-          date: dateStr,
-          ...sessionData,
-        });
-      });
-      
-      await Promise.all(createPromises);
-    }
-    
-    // Refetch to ensure we have the latest data
-    await queryClient.invalidateQueries({ queryKey: ['workSessions'] });
+        return createSessionMutation.mutateAsync({ date: dateStr, ...data });
+      }));
+    };
+
+    const persistMileage = async () => {
+      if (!mileage) return;
+
+      const existingMileage = dayMileageRecords.find((record) => record.date === dateStr);
+      const hasMileageData =
+        Boolean(existingMileage) ||
+        mileage.daily_miles_driven > 0 ||
+        mileage.daily_round_trip ||
+        Boolean(mileage.daily_mileage_notes?.trim());
+
+      if (!hasMileageData) return;
+
+      const mileageData = { date: dateStr, ...mileage };
+      if (existingMileage) {
+        await updateDayMileageMutation.mutateAsync({ id: existingMileage.id, data: mileageData });
+      } else {
+        await createDayMileageMutation.mutateAsync(mileageData);
+      }
+    };
+
+    await Promise.all([persistSessions(), persistMileage()]);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['workSessions'] }),
+      queryClient.invalidateQueries({ queryKey: ['dayMileage'] }),
+    ]);
     setIsModalOpen(false);
   };
 
@@ -220,13 +240,6 @@ export default function History() {
     return day.sessions.sort((a, b) => 
       new Date(a.start_time) - new Date(b.start_time)
     );
-  };
-
-  const handleUpdateSessionClient = async (sessionId, clientId) => {
-    await updateSessionMutation.mutateAsync({
-      id: sessionId,
-      data: { client_id: clientId },
-    });
   };
 
 if (isLoading) {
@@ -291,11 +304,10 @@ return (
 <DayModal
           date={selectedDate}
           sessions={getSessionsForDate(selectedDate)}
-          onSave={handleSaveHours}
+          onSave={handleSaveDay}
           onClose={() => setIsModalOpen(false)}
           isOpen={isModalOpen}
           clients={clients}
-          onUpdateSessionClient={handleUpdateSessionClient}
         />
       </div>
     </div>
