@@ -45,6 +45,8 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoiceData, onFo
     notes,
     isSubmitted,
     isPaid,
+    submittedDate,
+    paidDate,
   } = invoiceData;
 
   const handleFormatToggle = (newFormat) => {
@@ -82,7 +84,12 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoiceData, onFo
   const formatGeneratedDate = (isoDate) => {
     if (!isoDate) return null;
     const date = new Date(isoDate);
-    return format(date, 'MM/dd/yyyy');
+    return Number.isNaN(date.getTime()) ? null : format(date, 'MM/dd/yyyy');
+  };
+
+  const formatStatusDate = (isoDate) => {
+    const formattedDate = formatGeneratedDate(isoDate);
+    return formattedDate || 'Date not recorded';
   };
 
   const handleDownloadPDF = () => {
@@ -112,6 +119,14 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoiceData, onFo
     if (generatedDate) {
       yPos += 6;
       doc.text(`Generated: ${formatGeneratedDate(generatedDate)}`, 20, yPos);
+    }
+    if (isSubmitted) {
+      yPos += 6;
+      doc.text(`Submitted: ${formatStatusDate(submittedDate)}`, 20, yPos);
+    }
+    if (isPaid) {
+      yPos += 6;
+      doc.text(`Paid: ${formatStatusDate(paidDate)}`, 20, yPos);
     }
     
     // Horizontal line
@@ -389,6 +404,12 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoiceData, onFo
             <p className="text-slate-600">Date: {invoiceDate}</p>
             {generatedDate && (
               <p className="text-slate-600">Generated: {formatGeneratedDate(generatedDate)}</p>
+            )}
+            {isSubmitted && (
+              <p className="text-slate-600">Submitted: {formatStatusDate(submittedDate)}</p>
+            )}
+            {isPaid && (
+              <p className="text-slate-600">Paid: {formatStatusDate(paidDate)}</p>
             )}
           </div>
 

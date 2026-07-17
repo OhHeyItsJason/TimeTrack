@@ -54,16 +54,24 @@ export default function InvoiceHistory() {
   });
 
   const handleToggleSubmitted = async (invoice) => {
+    const isSubmitting = !invoice.is_submitted;
     await updateInvoiceMutation.mutateAsync({
       id: invoice.id,
-      data: { is_submitted: !invoice.is_submitted },
+      data: {
+        is_submitted: isSubmitting,
+        submitted_date: isSubmitting ? new Date().toISOString() : null,
+      },
     });
   };
 
   const handleTogglePaid = async (invoice) => {
+    const isPaying = !invoice.is_paid;
     await updateInvoiceMutation.mutateAsync({
       id: invoice.id,
-      data: { is_paid: !invoice.is_paid },
+      data: {
+        is_paid: isPaying,
+        paid_date: isPaying ? new Date().toISOString() : null,
+      },
     });
   };
 
@@ -119,6 +127,8 @@ export default function InvoiceHistory() {
       notes: invoice.notes || '',
       isSubmitted: invoice.is_submitted || false,
       isPaid: invoice.is_paid || false,
+      submittedDate: invoice.submitted_date || null,
+      paidDate: invoice.paid_date || null,
     };
 
     setSelectedInvoice(invoiceData);
@@ -155,6 +165,28 @@ export default function InvoiceHistory() {
   const parseLocalDate = (dateStr) => {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
+  };
+
+  const formatStatusDate = (dateStr) => {
+    if (!dateStr) return 'Date not recorded';
+
+    const date = new Date(dateStr);
+    return Number.isNaN(date.getTime()) ? 'Date not recorded' : format(date, 'MMM d, yyyy');
+  };
+
+  const InvoiceStatusDates = ({ invoice }) => {
+    if (!invoice.is_submitted && !invoice.is_paid) return null;
+
+    return (
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+        {invoice.is_submitted && (
+          <span>Submitted {formatStatusDate(invoice.submitted_date)}</span>
+        )}
+        {invoice.is_paid && (
+          <span>Paid {formatStatusDate(invoice.paid_date)}</span>
+        )}
+      </div>
+    );
   };
 
   const openInvoices = invoices.filter(inv => !inv.is_paid);
@@ -272,6 +304,7 @@ if (isLoading) {
                                 <p className="text-xs text-gray-500">
                                   {format(parseLocalDate(invoice.start_date), 'MMM d')} - {format(parseLocalDate(invoice.end_date), 'MMM d, yyyy')}
                                 </p>
+                                <InvoiceStatusDates invoice={invoice} />
                               </div>
                             </div>
                           </div>
@@ -378,6 +411,7 @@ if (isLoading) {
                                 <p className="text-xs text-gray-500">
                                   {format(parseLocalDate(invoice.start_date), 'MMM d')} - {format(parseLocalDate(invoice.end_date), 'MMM d, yyyy')}
                                 </p>
+                                <InvoiceStatusDates invoice={invoice} />
                               </div>
                             </div>
                           </div>
