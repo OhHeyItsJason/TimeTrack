@@ -79,7 +79,7 @@ export default function CalendarView({
             
             const isClickable =
               mode === "view" ||
-              (isCurrentMonth && mode === "select" && hasWorkToday && !(isPaidForClient || isInvoicedForClient));
+              (mode === "select" && hasWorkToday && !(isPaidForClient || isInvoicedForClient));
 
             // Determine work day styling (even for selected days to show status)
             let workDayClass = '';
