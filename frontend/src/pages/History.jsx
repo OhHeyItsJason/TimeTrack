@@ -167,13 +167,18 @@ export default function History() {
     }
   });
 
-  // Build mileageByDate map for CalendarView mileage indicators
-    const mileageByDate = {};
-    dayMileageRecords.forEach(record => {
-      if (record.daily_miles_driven > 0) {
-        mileageByDate[record.date] = true;
-      }
-    });
+  // Mark calendar days that contain either daily or session-specific mileage.
+  const mileageByDate = {};
+  dayMileageRecords.forEach((record) => {
+    if (record.daily_miles_driven > 0) {
+      mileageByDate[record.date] = true;
+    }
+  });
+  sessions.forEach((session) => {
+    if (session.session_miles_driven > 0) {
+      mileageByDate[session.date] = true;
+    }
+  });
 
   const handleDayClick = (date) => {
     setSelectedDate(date);

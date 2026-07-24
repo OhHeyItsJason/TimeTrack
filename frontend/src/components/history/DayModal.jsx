@@ -28,6 +28,9 @@ const EMPTY_SESSION = {
   endTime: "17:00",
   breakMinutes: 0,
   clientId: null,
+  milesDriven: "",
+  roundTrip: false,
+  mileageNotes: "",
 };
 
 function extractTime(isoString, defaultTime) {
@@ -56,9 +59,10 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [loadedMileageDate, setLoadedMileageDate] = useState(null);
 
   const dateStr = date ? format(date, "yyyy-MM-dd") : null;
-  const { data: dayMileageRecords = [] } = useQuery({
+  const { data: dayMileageRecords = [], isLoading: isLoadingDayMileage } = useQuery({
     queryKey: ["dayMileage", dateStr],
     queryFn: () => appClient.entities.DayMileage.filter({ date: dateStr }),
     enabled: Boolean(dateStr && isOpen),
@@ -73,6 +77,9 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
             endTime: extractTime(session.end_time, "17:00"),
             breakMinutes: session.break_minutes || 0,
             clientId: session.client_id || null,
+            milesDriven: session.session_miles_driven != null ? String(session.session_miles_driven) : "",
+            roundTrip: Boolean(session.session_round_trip),
+            mileageNotes: session.session_mileage_notes || "",
           }))
         : [{ ...EMPTY_SESSION }]
     );
@@ -81,11 +88,19 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
   }, [sessions, isOpen]);
 
   useEffect(() => {
+    if (!isOpen) {
+      setLoadedMileageDate(null);
+      return;
+    }
+
+    if (isLoadingDayMileage || loadedMileageDate === dateStr) return;
+
     const record = dayMileageRecords[0];
     setDailyMilesDriven(record?.daily_miles_driven ? String(record.daily_miles_driven) : "");
     setDailyRoundTrip(record?.daily_round_trip || false);
     setDailyMileageNotes(record?.daily_mileage_notes || "");
-  }, [dayMileageRecords, isOpen]);
+    setLoadedMileageDate(dateStr);
+  }, [dateStr, dayMileageRecords, isLoadingDayMileage, isOpen, loadedMileageDate]);
 
   if (!date) return null;
 
@@ -106,6 +121,11 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
     (total, session) => total + calculateSessionHours(session.startTime, session.endTime, session.breakMinutes),
     0
   );
+  const sessionMileageTotal = editingSessions.reduce(
+    (total, session) => total + (Number(session.milesDriven) || 0) * (session.roundTrip ? 2 : 1),
+    0
+  );
+  const isMileageReady = loadedMileageDate === dateStr;
 
   const handleSave = async () => {
     if (editingSessions.some((session) => !session.startTime || !session.endTime)) {
@@ -122,6 +142,9 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
       break_minutes: Number(session.breakMinutes) || 0,
       is_active: false,
       client_id: session.clientId || null,
+      session_miles_driven: parseFloat(session.milesDriven) || 0,
+      session_round_trip: session.roundTrip,
+      session_mileage_notes: session.mileageNotes.trim() || null,
     }));
 
     setIsSaving(true);
@@ -255,6 +278,51 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
                           </div>
                         </div>
                       </div>
+                      <div className="mt-3 rounded-[12px] border border-amber-100 bg-amber-50 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <Label className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+                            <Car className="h-4 w-4" />
+                            Session Mileage
+                          </Label>
+                          <span className="text-sm font-semibold text-amber-700">
+                            {((Number(session.milesDriven) || 0) * (session.roundTrip ? 2 : 1)).toFixed(1)} mi
+                          </span>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label htmlFor={`sessionMiles-${index}`} className="text-xs text-amber-700">Miles Driven</Label>
+                            <Input
+                              id={`sessionMiles-${index}`}
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={session.milesDriven}
+                              onChange={(event) => updateSession(index, "milesDriven", event.target.value)}
+                              disabled={isSaving}
+                              className="h-10 rounded-[10px] border-amber-100 bg-white text-gray-900"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-amber-700">Round trip</Label>
+                            <div className="flex h-10 items-center gap-3 rounded-[10px] border border-amber-100 bg-white px-3">
+                              <Switch checked={session.roundTrip} onCheckedChange={(value) => updateSession(index, "roundTrip", value)} disabled={isSaving} />
+                              <span className="text-sm text-gray-700">{session.roundTrip ? "Yes" : "No"}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 space-y-1">
+                          <Label htmlFor={`sessionMileageNotes-${index}`} className="text-xs text-amber-700">Mileage Notes</Label>
+                          <Input
+                            id={`sessionMileageNotes-${index}`}
+                            value={session.mileageNotes}
+                            onChange={(event) => updateSession(index, "mileageNotes", event.target.value)}
+                            disabled={isSaving}
+                            className="h-10 rounded-[10px] border-amber-100 bg-white text-gray-900"
+                            placeholder="Optional note"
+                          />
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -269,6 +337,11 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
                 <span className="text-sm font-semibold text-blue-700">Total Hours</span>
                 <span className="text-2xl font-bold text-blue-700">{editingTotalHours.toFixed(2)}</span>
               </div>
+              {sessionMileageTotal > 0 && (
+                <p className="mt-3 text-right text-sm font-medium text-amber-700">
+                  Session mileage total: {sessionMileageTotal.toFixed(1)} mi
+                </p>
+              )}
             </section>
 
             <section className="rounded-[20px] border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-5">
@@ -280,12 +353,12 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor="dailyMiles" className="text-xs text-gray-600">Miles Driven</Label>
-                  <Input id="dailyMiles" type="number" min="0" step="0.1" value={dailyMilesDriven} onChange={(event) => setDailyMilesDriven(event.target.value)} className="h-10 rounded-[12px] border-gray-200 bg-white text-gray-900" placeholder="0" />
+                  <Input id="dailyMiles" type="number" min="0" step="0.1" value={dailyMilesDriven} onChange={(event) => setDailyMilesDriven(event.target.value)} disabled={!isMileageReady || isSaving} className="h-10 rounded-[12px] border-gray-200 bg-white text-gray-900" placeholder="0" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-gray-600">Round trip</Label>
                   <div className="flex h-10 items-center gap-3 rounded-[12px] border border-gray-200 bg-white px-3">
-                    <Switch checked={dailyRoundTrip} onCheckedChange={setDailyRoundTrip} />
+                    <Switch checked={dailyRoundTrip} onCheckedChange={setDailyRoundTrip} disabled={!isMileageReady || isSaving} />
                     <span className="text-sm text-gray-700">{dailyRoundTrip ? "Yes" : "No"}</span>
                   </div>
                 </div>
@@ -293,8 +366,9 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
 
               <div className="mt-3 space-y-1">
                 <Label htmlFor="dailyMileageNotes" className="text-xs text-gray-600">Notes</Label>
-                <Textarea id="dailyMileageNotes" value={dailyMileageNotes} onChange={(event) => setDailyMileageNotes(event.target.value)} className="min-h-20 rounded-[12px] border-gray-200 bg-white text-sm text-gray-900" placeholder="Add a note..." />
+                <Textarea id="dailyMileageNotes" value={dailyMileageNotes} onChange={(event) => setDailyMileageNotes(event.target.value)} disabled={!isMileageReady || isSaving} className="min-h-20 rounded-[12px] border-gray-200 bg-white text-sm text-gray-900" placeholder="Add a note..." />
               </div>
+              {!isMileageReady && <p className="mt-3 text-sm text-amber-700">Loading saved day mileage...</p>}
             </section>
 
             {saveError && <p className="text-sm text-red-600">{saveError}</p>}
@@ -302,7 +376,7 @@ export default function DayModal({ date, sessions = [], onSave, onClose, isOpen,
 
           <DialogFooter className="border-t border-gray-100 pt-4 sm:justify-end">
             <Button variant="outline" onClick={onClose} disabled={isSaving} className="rounded-[14px] border-gray-200 text-gray-700 hover:bg-gray-100">Cancel</Button>
-            <Button onClick={handleSave} disabled={isSaving} className="rounded-[14px] bg-blue-600 text-white hover:bg-blue-700">
+            <Button onClick={handleSave} disabled={isSaving || !isMileageReady} className="rounded-[14px] bg-blue-600 text-white hover:bg-blue-700">
               <Save className="mr-2 h-4 w-4" />
               {isSaving ? "Saving..." : "Save changes"}
             </Button>
