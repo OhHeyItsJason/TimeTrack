@@ -57,6 +57,7 @@ const [selectedClientId, setSelectedClientId] = useState("");
     queryKey: ['clients'],
     queryFn: () => appClient.entities.Client.list('name'),
   });
+  const activeClients = clients.filter((client) => !client.is_archived);
 
   const todaySessions = allSessions.filter(s => s.date === today);
   const activeSession = allSessions.find(s => s.is_active);
@@ -111,7 +112,8 @@ const [selectedClientId, setSelectedClientId] = useState("");
   });
 
   const handleStart = async () => {
-    if (!selectedClientId) {
+    const selectedClient = activeClients.find((client) => client.id === selectedClientId);
+    if (!selectedClient) {
       setShowNoClientDialog(true);
       return;
     }
@@ -440,7 +442,7 @@ return (
                         <SelectValue placeholder="Choose a client..." />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-gray-200 rounded-[16px]">
-                        {clients.filter(c => !c.is_archived).map((client) => (
+                        {activeClients.map((client) => (
                           <SelectItem key={client.id} value={client.id} className="text-gray-900 rounded-[12px]">
                             {client.name}
                           </SelectItem>
@@ -648,7 +650,7 @@ return (
                   <SelectValue placeholder="No client" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-gray-200 rounded-[16px]">
-                  {clients.filter(c => !c.is_archived).map((client) => (
+                  {activeClients.map((client) => (
                     <SelectItem key={client.id} value={client.id} className="text-gray-900 rounded-[12px]">
                       {client.name}
                     </SelectItem>
