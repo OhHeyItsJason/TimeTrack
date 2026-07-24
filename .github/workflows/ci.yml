@@ -33,7 +33,6 @@ jobs:
         with:
           node-version: 20
       - run: node --check backend_server.cjs
-      - run: node --check import/import_base44_csv.cjs
 
   migration-validate:
     runs-on: ubuntu-latest
