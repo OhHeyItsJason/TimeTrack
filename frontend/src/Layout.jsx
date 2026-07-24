@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Timer, History, FileText, Settings, Receipt, Clock } from "lucide-react";
+import { Timer, History, FileText, Settings, Clock } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -30,11 +30,6 @@ const navigationItems = [
     title: "Invoice",
     url: createPageUrl("Invoice"),
     icon: FileText,
-  },
-  {
-    title: "Invoice History",
-    url: createPageUrl("InvoiceHistory"),
-    icon: Receipt,
   },
   {
     title: "Settings",

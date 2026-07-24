@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import InvoicePreviewModal from "../components/invoice/InvoicePreviewModal";
 import EditInvoiceModal from "../components/invoice/EditInvoiceModal";
 
-export default function InvoiceHistory() {
+export default function InvoiceHistory({ embedded = false }) {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -216,10 +216,10 @@ export default function InvoiceHistory() {
   const openInvoices = invoices.filter(inv => !inv.is_paid);
   const paidInvoices = invoices.filter(inv => inv.is_paid);
 
-if (isLoading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#f2f2f7] p-4 md:p-8">
-        <div className="max-w-6xl mx-auto space-y-4">
+      <div className={embedded ? "space-y-4" : "min-h-screen bg-[#f2f2f7] p-4 md:p-8"}>
+        <div className={embedded ? "space-y-4" : "mx-auto max-w-6xl space-y-4"}>
           <Skeleton className="h-12 w-64 bg-gray-200" />
           <Skeleton className="h-32 w-full bg-gray-200" />
           <Skeleton className="h-32 w-full bg-gray-200" />
@@ -229,18 +229,20 @@ if (isLoading) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f2f2f7] p-4 md:p-8 pb-24">
-      <div className="max-w-6xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 mb-2">
-            Invoice History
-          </h1>
-          <p className="text-gray-500 text-lg">Manage and track all your invoices</p>
-        </motion.div>
+    <div className={embedded ? "" : "min-h-screen bg-[#f2f2f7] p-4 pb-24 md:p-8"}>
+      <div className={embedded ? "" : "mx-auto max-w-6xl"}>
+        {!embedded && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <h1 className="mb-2 text-4xl font-semibold text-gray-900 md:text-5xl">
+              Invoice History
+            </h1>
+            <p className="text-lg text-gray-500">Manage and track all your invoices</p>
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

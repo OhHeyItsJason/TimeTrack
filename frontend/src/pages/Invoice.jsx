@@ -20,7 +20,7 @@ import {
 import CalendarView from "../components/history/CalendarView";
 import InvoicePreviewModal from "../components/invoice/InvoicePreviewModal";
 
-export default function Invoice() {
+export default function Invoice({ embedded = false }) {
   const [selectedDates, setSelectedDates] = useState(new Set());
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -544,18 +544,20 @@ export default function Invoice() {
   };
 
 return (
-    <div className="min-h-screen bg-[#f2f2f7] p-4 md:p-8 pb-24">
-      <div className="max-w-6xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 mb-2">
-            Generate Invoice
-          </h1>
-          <p className="text-gray-500 text-lg">Fill in client details, then select dates to include in your invoice</p>
-        </motion.div>
+    <div className={embedded ? "" : "min-h-screen bg-[#f2f2f7] p-4 pb-24 md:p-8"}>
+      <div className={embedded ? "" : "mx-auto max-w-6xl"}>
+        {!embedded && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <h1 className="mb-2 text-4xl font-semibold text-gray-900 md:text-5xl">
+              Generate Invoice
+            </h1>
+            <p className="text-lg text-gray-500">Fill in client details, then select dates to include in your invoice</p>
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
