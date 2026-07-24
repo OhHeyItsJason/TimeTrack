@@ -93,9 +93,10 @@ export default function Invoice() {
 
   const settingsData = settings[0] || {};
   const defaultHourlyRate = settingsData.hourly_rate || 50;
+  const activeClients = clients.filter((client) => !client.is_archived);
 
   // Get the selected client's hourly rate, falling back to default
-  const selectedClient = clients.find(c => c.id === selectedClientId);
+  const selectedClient = activeClients.find(c => c.id === selectedClientId);
   const hourlyRate = selectedClient?.hourly_rate ?? defaultHourlyRate;
 
   // Build client lookup by abbreviation
@@ -269,23 +270,23 @@ export default function Invoice() {
 
   const handleInvoiceNumberChange = (value) => {
     setInvoiceNumber(value);
-    const client = clients.find(c => c.id === selectedClientId);
+    const client = activeClients.find(c => c.id === selectedClientId);
     validateInvoiceNumber(value, client?.abbreviation || "");
   };
 
   const handleClientSelect = (clientId) => {
+    const client = activeClients.find((item) => item.id === clientId);
+    if (clientId && !client) return;
+
     setSelectedClientId(clientId);
     setSelectedDates(new Set()); // Clear selected dates when client changes
     
     if (clientId) {
-      const client = clients.find(c => c.id === clientId);
-      if (client) {
-        setClientName(client.name || "");
-        setClientEmail(client.email || "");
-        setClientPhone(client.phone || "");
-        setClientAddress(client.address || "");
-        generateInvoiceNumber(clientId, client.abbreviation || "");
-      }
+      setClientName(client.name || "");
+      setClientEmail(client.email || "");
+      setClientPhone(client.phone || "");
+      setClientAddress(client.address || "");
+      generateInvoiceNumber(clientId, client.abbreviation || "");
     } else {
       setClientName("");
       setClientEmail("");
@@ -299,7 +300,7 @@ export default function Invoice() {
   // Re-generate invoice number when invoices or counters change (for selected client)
   useEffect(() => {
     if (selectedClientId) {
-      const client = clients.find(c => c.id === selectedClientId);
+      const client = clients.find(c => c.id === selectedClientId && !c.is_archived);
       if (client?.abbreviation && !invoiceNumber) {
         generateInvoiceNumber(selectedClientId, client.abbreviation);
       }
@@ -392,10 +393,15 @@ export default function Invoice() {
       return;
     }
 
+    if (selectedClientId && !selectedClient) {
+      alert("This client is archived and cannot be used for a new invoice.");
+      return;
+    }
+
     setIsGenerating(true);
 
     try {
-      const client = clients.find(c => c.id === selectedClientId);
+      const client = selectedClient;
       const clientAbbreviation = client?.abbreviation || "";
       const generatedDate = new Date().toISOString();
 
@@ -574,12 +580,12 @@ return (
                         <SelectValue placeholder="Choose" />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-gray-200 rounded-[16px]">
-{clients.length === 0 ? (
+{activeClients.length === 0 ? (
                           <div className="p-2 text-sm text-gray-500 text-center">
-                            No saved clients
+                            No active clients
                           </div>
                         ) : (
-                          clients.map((client) => (
+                          activeClients.map((client) => (
                             <SelectItem key={client.id} value={client.id} className="text-gray-900 rounded-[12px]">
                               {client.name}
                             </SelectItem>
