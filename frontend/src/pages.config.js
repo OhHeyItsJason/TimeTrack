@@ -1,7 +1,7 @@
 import History from './pages/History';
 import Home from './pages/Home';
-import Invoice from './pages/Invoice';
-import InvoiceHistory from './pages/InvoiceHistory';
+import Invoices from './pages/Invoices';
+import InvoiceHistoryRedirect from './pages/InvoiceHistoryRedirect';
 import Settings from './pages/Settings';
 import Timer from './pages/Timer';
 import __Layout from './Layout.jsx';
@@ -10,8 +10,8 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "History": History,
     "Home": Home,
-    "Invoice": Invoice,
-    "InvoiceHistory": InvoiceHistory,
+    "Invoice": Invoices,
+    "InvoiceHistory": InvoiceHistoryRedirect,
     "Settings": Settings,
     "Timer": Timer,
 }
