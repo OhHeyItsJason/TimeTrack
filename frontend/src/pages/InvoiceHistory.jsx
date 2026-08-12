@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { FileText, Send, DollarSign, Trash2, Eye, Pencil } from "lucide-react";
+import { FileText, Send, DollarSign, Trash2, Eye, Pencil, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import InvoicePreviewModal from "../components/invoice/InvoicePreviewModal";
@@ -26,6 +27,7 @@ export default function InvoiceHistory({ embedded = false }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [invoiceToEdit, setInvoiceToEdit] = useState(null);
   const [statusChangeConfirmation, setStatusChangeConfirmation] = useState(null);
+  const [statusUpdateError, setStatusUpdateError] = useState("");
   const queryClient = useQueryClient();
 
   const { data: invoices = [], isLoading } = useQuery({
@@ -57,33 +59,45 @@ export default function InvoiceHistory({ embedded = false }) {
   const handleToggleSubmitted = async (invoice) => {
     const isSubmitting = !invoice.is_submitted;
     if (!isSubmitting) {
+      setStatusUpdateError("");
       setStatusChangeConfirmation({ invoice, status: 'submitted' });
       return;
     }
 
-    await updateInvoiceMutation.mutateAsync({
-      id: invoice.id,
-      data: {
-        is_submitted: isSubmitting,
-        submitted_date: isSubmitting ? new Date().toISOString() : null,
-      },
-    });
+    setStatusUpdateError("");
+    try {
+      await updateInvoiceMutation.mutateAsync({
+        id: invoice.id,
+        data: {
+          is_submitted: isSubmitting,
+          submitted_date: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      setStatusUpdateError(error?.message || "Unable to mark this invoice as submitted. Please try again.");
+    }
   };
 
   const handleTogglePaid = async (invoice) => {
     const isPaying = !invoice.is_paid;
     if (!isPaying) {
+      setStatusUpdateError("");
       setStatusChangeConfirmation({ invoice, status: 'paid' });
       return;
     }
 
-    await updateInvoiceMutation.mutateAsync({
-      id: invoice.id,
-      data: {
-        is_paid: isPaying,
-        paid_date: isPaying ? new Date().toISOString() : null,
-      },
-    });
+    setStatusUpdateError("");
+    try {
+      await updateInvoiceMutation.mutateAsync({
+        id: invoice.id,
+        data: {
+          is_paid: isPaying,
+          paid_date: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      setStatusUpdateError(error?.message || "Unable to mark this invoice as paid. Please try again.");
+    }
   };
 
   const handleViewDetails = (invoice) => {
@@ -161,13 +175,18 @@ export default function InvoiceHistory({ embedded = false }) {
     if (!statusChangeConfirmation) return;
 
     const { invoice, status } = statusChangeConfirmation;
-    await updateInvoiceMutation.mutateAsync({
-      id: invoice.id,
-      data: status === 'submitted'
-        ? { is_submitted: false, submitted_date: null }
-        : { is_paid: false, paid_date: null },
-    });
-    setStatusChangeConfirmation(null);
+    setStatusUpdateError("");
+    try {
+      await updateInvoiceMutation.mutateAsync({
+        id: invoice.id,
+        data: status === 'submitted'
+          ? { is_submitted: false, submitted_date: null }
+          : { is_paid: false, paid_date: null },
+      });
+      setStatusChangeConfirmation(null);
+    } catch (error) {
+      setStatusUpdateError(error?.message || "Unable to update this invoice. Please try again.");
+    }
   };
 
   const handleEditClick = (invoice) => {
@@ -242,6 +261,14 @@ export default function InvoiceHistory({ embedded = false }) {
             </h1>
             <p className="text-lg text-gray-500">Manage and track all your invoices</p>
           </motion.div>
+        )}
+
+        {statusUpdateError && (
+          <Alert variant="destructive" className="mb-6 border-red-200 bg-red-50 text-red-900">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Invoice status was not updated</AlertTitle>
+            <AlertDescription>{statusUpdateError}</AlertDescription>
+          </Alert>
         )}
 
         <motion.div
@@ -365,6 +392,7 @@ export default function InvoiceHistory({ embedded = false }) {
                               variant={invoice.is_submitted ? "default" : "outline"}
                               size="sm"
                               onClick={() => handleToggleSubmitted(invoice)}
+                              disabled={updateInvoiceMutation.isPending}
                               className={invoice.is_submitted ? "bg-blue-600 hover:bg-blue-700 text-white rounded-[14px]" : "border-gray-200 text-gray-700 hover:bg-gray-100 rounded-[14px]"}
                               title={invoice.is_submitted ? "Mark unsubmitted" : "Mark submitted"}
                             >
@@ -375,6 +403,7 @@ export default function InvoiceHistory({ embedded = false }) {
                               variant="outline"
                               size="sm"
                               onClick={() => handleTogglePaid(invoice)}
+                              disabled={updateInvoiceMutation.isPending}
                               className="text-green-600 hover:bg-green-50 border-gray-200 rounded-[14px]"
                               title="Mark paid"
                             >
@@ -463,6 +492,7 @@ export default function InvoiceHistory({ embedded = false }) {
                               variant="outline"
                               size="sm"
                               onClick={() => handleTogglePaid(invoice)}
+                              disabled={updateInvoiceMutation.isPending}
                               className="text-orange-600 hover:bg-orange-50 border-gray-200 rounded-[14px]"
                               title="Mark unpaid"
                             >
@@ -538,6 +568,13 @@ export default function InvoiceHistory({ embedded = false }) {
                     <DialogTitle className="text-gray-900">{actionLabel}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
+                    {statusUpdateError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-900">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Invoice status was not updated</AlertTitle>
+                        <AlertDescription>{statusUpdateError}</AlertDescription>
+                      </Alert>
+                    )}
                     <p className="text-gray-600">
                       {isUnsubmitting
                         ? `This will return ${invoice.invoice_number} to draft status and clear its submitted date.`
