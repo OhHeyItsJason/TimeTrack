@@ -110,7 +110,7 @@ export default function Invoice({ embedded = false }) {
   // Compute statusByDateByClient from invoices
   const statusByDateByClient = {};
   invoices.forEach(invoice => {
-    if (!invoice.is_submitted && !invoice.is_paid) return;
+    if (invoice.is_canceled || (!invoice.is_submitted && !invoice.is_paid)) return;
     
     const abbr = invoice.client_abbreviation?.toUpperCase();
     if (!abbr) return;
@@ -517,6 +517,8 @@ export default function Invoice({ embedded = false }) {
         notes: additionalNotes || '',
         is_submitted: false,
         is_paid: false,
+        is_canceled: false,
+        canceled_date: null,
         generated_date: generatedDate,
         client_abbreviation: clientAbbreviation,
       });
