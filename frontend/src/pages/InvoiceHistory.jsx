@@ -13,11 +13,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { FileText, Send, DollarSign, Trash2, Eye, Pencil, AlertTriangle } from "lucide-react";
+import { FileText, Send, DollarSign, Trash2, Eye, Pencil, AlertTriangle, CalendarDays, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import InvoicePreviewModal from "../components/invoice/InvoicePreviewModal";
 import EditInvoiceModal from "../components/invoice/EditInvoiceModal";
+import InvoiceStatusModal from "../components/invoice/InvoiceStatusModal";
 
 export default function InvoiceHistory({ embedded = false }) {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -26,7 +27,10 @@ export default function InvoiceHistory({ embedded = false }) {
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [invoiceToEdit, setInvoiceToEdit] = useState(null);
-  const [statusChangeConfirmation, setStatusChangeConfirmation] = useState(null);
+  const [invoiceToManage, setInvoiceToManage] = useState(null);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [invoiceToCancel, setInvoiceToCancel] = useState(null);
+  const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
   const [statusUpdateError, setStatusUpdateError] = useState("");
   const queryClient = useQueryClient();
 
@@ -56,47 +60,52 @@ export default function InvoiceHistory({ embedded = false }) {
     },
   });
 
-  const handleToggleSubmitted = async (invoice) => {
-    const isSubmitting = !invoice.is_submitted;
-    if (!isSubmitting) {
-      setStatusUpdateError("");
-      setStatusChangeConfirmation({ invoice, status: 'submitted' });
-      return;
-    }
+  const handleOpenStatusManager = (invoice) => {
+    setStatusUpdateError("");
+    setInvoiceToManage(invoice);
+    setIsStatusModalOpen(true);
+  };
+
+  const handleSaveStatus = async (data) => {
+    if (!invoiceToManage) return;
 
     setStatusUpdateError("");
     try {
-      await updateInvoiceMutation.mutateAsync({
-        id: invoice.id,
-        data: {
-          is_submitted: isSubmitting,
-          submitted_date: new Date().toISOString(),
-        },
-      });
+      await updateInvoiceMutation.mutateAsync({ id: invoiceToManage.id, data });
+      setIsStatusModalOpen(false);
+      setInvoiceToManage(null);
     } catch (error) {
-      setStatusUpdateError(error?.message || "Unable to mark this invoice as submitted. Please try again.");
+      setStatusUpdateError(error?.message || "Unable to update this invoice. Please try again.");
     }
   };
 
-  const handleTogglePaid = async (invoice) => {
-    const isPaying = !invoice.is_paid;
-    if (!isPaying) {
-      setStatusUpdateError("");
-      setStatusChangeConfirmation({ invoice, status: 'paid' });
-      return;
-    }
+  const handleCancelRequest = (invoice) => {
+    setStatusUpdateError("");
+    setIsStatusModalOpen(false);
+    setInvoiceToCancel(invoice);
+    setIsCancelConfirmOpen(true);
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!invoiceToCancel) return;
 
     setStatusUpdateError("");
     try {
       await updateInvoiceMutation.mutateAsync({
-        id: invoice.id,
+        id: invoiceToCancel.id,
         data: {
-          is_paid: isPaying,
-          paid_date: new Date().toISOString(),
+          is_canceled: true,
+          canceled_date: new Date().toISOString(),
+          is_submitted: false,
+          submitted_date: null,
+          is_paid: false,
+          paid_date: null,
         },
       });
+      setIsCancelConfirmOpen(false);
+      setInvoiceToCancel(null);
     } catch (error) {
-      setStatusUpdateError(error?.message || "Unable to mark this invoice as paid. Please try again.");
+      setStatusUpdateError(error?.message || "Unable to cancel this invoice. Please try again.");
     }
   };
 
@@ -171,24 +180,6 @@ export default function InvoiceHistory({ embedded = false }) {
     }
   };
 
-  const handleConfirmStatusChange = async () => {
-    if (!statusChangeConfirmation) return;
-
-    const { invoice, status } = statusChangeConfirmation;
-    setStatusUpdateError("");
-    try {
-      await updateInvoiceMutation.mutateAsync({
-        id: invoice.id,
-        data: status === 'submitted'
-          ? { is_submitted: false, submitted_date: null }
-          : { is_paid: false, paid_date: null },
-      });
-      setStatusChangeConfirmation(null);
-    } catch (error) {
-      setStatusUpdateError(error?.message || "Unable to update this invoice. Please try again.");
-    }
-  };
-
   const handleEditClick = (invoice) => {
     setInvoiceToEdit(invoice);
     setIsEditOpen(true);
@@ -218,6 +209,10 @@ export default function InvoiceHistory({ embedded = false }) {
   };
 
   const InvoiceStatusDates = ({ invoice }) => {
+    if (invoice.is_canceled) {
+      return <div className="mt-2 text-xs text-red-600">Canceled {formatStatusDate(invoice.canceled_date)}</div>;
+    }
+
     if (!invoice.is_submitted && !invoice.is_paid) return null;
 
     return (
@@ -232,8 +227,9 @@ export default function InvoiceHistory({ embedded = false }) {
     );
   };
 
-  const openInvoices = invoices.filter(inv => !inv.is_paid);
-  const paidInvoices = invoices.filter(inv => inv.is_paid);
+  const canceledInvoices = invoices.filter((invoice) => invoice.is_canceled);
+  const openInvoices = invoices.filter((invoice) => !invoice.is_canceled && !invoice.is_paid);
+  const paidInvoices = invoices.filter((invoice) => !invoice.is_canceled && invoice.is_paid);
 
   if (isLoading) {
     return (
@@ -275,7 +271,7 @@ export default function InvoiceHistory({ embedded = false }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid md:grid-cols-3 gap-6 mb-8"
+          className="grid gap-6 md:grid-cols-4 mb-8"
         >
 <Card className="shadow-lg border-0 bg-white/80 ios-blur rounded-[28px]">
             <CardContent className="p-6">
@@ -308,6 +304,16 @@ export default function InvoiceHistory({ embedded = false }) {
               <p className="text-5xl font-bold text-green-600">
                 {paidInvoices.length}
               </p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg border-0 bg-gradient-to-br from-red-50 to-rose-50 rounded-[28px]">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <XCircle className="w-5 h-5 text-red-600" />
+                <p className="text-sm text-red-600 font-semibold tracking-wide uppercase">Canceled</p>
+              </div>
+              <p className="text-5xl font-bold text-red-600">{canceledInvoices.length}</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -389,25 +395,13 @@ export default function InvoiceHistory({ embedded = false }) {
                             )}
                             
                             <Button
-                              variant={invoice.is_submitted ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handleToggleSubmitted(invoice)}
-                              disabled={updateInvoiceMutation.isPending}
-                              className={invoice.is_submitted ? "bg-blue-600 hover:bg-blue-700 text-white rounded-[14px]" : "border-gray-200 text-gray-700 hover:bg-gray-100 rounded-[14px]"}
-                              title={invoice.is_submitted ? "Mark unsubmitted" : "Mark submitted"}
-                            >
-                              <Send className="w-4 h-4" />
-                            </Button>
-                            
-                            <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleTogglePaid(invoice)}
-                              disabled={updateInvoiceMutation.isPending}
-                              className="text-green-600 hover:bg-green-50 border-gray-200 rounded-[14px]"
-                              title="Mark paid"
+                              onClick={() => handleOpenStatusManager(invoice)}
+                              className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-[14px]"
+                              title="Manage invoice status"
                             >
-                              <DollarSign className="w-4 h-4" />
+                              <CalendarDays className="w-4 h-4" />
                             </Button>
                             
                             <Button
@@ -491,12 +485,11 @@ export default function InvoiceHistory({ embedded = false }) {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleTogglePaid(invoice)}
-                              disabled={updateInvoiceMutation.isPending}
-                              className="text-orange-600 hover:bg-orange-50 border-gray-200 rounded-[14px]"
-                              title="Mark unpaid"
+                              onClick={() => handleOpenStatusManager(invoice)}
+                              className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-[14px]"
+                              title="Manage invoice status"
                             >
-                              Mark Unpaid
+                              <CalendarDays className="w-4 h-4" />
                             </Button>
                             
                             <Button
@@ -512,6 +505,53 @@ export default function InvoiceHistory({ embedded = false }) {
                       </motion.div>
                     ))}
                   </AnimatePresence>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {canceledInvoices.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mb-8"
+          >
+            <Card className="border-0 bg-red-50/80 shadow-lg rounded-[28px]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl text-red-900">
+                  <XCircle className="w-5 h-5 text-red-600" />
+                  Canceled Invoices
+                </CardTitle>
+                <p className="text-sm text-red-700">Canceled invoice numbers remain reserved and are skipped for future invoices.</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {canceledInvoices.map((invoice) => (
+                    <div key={invoice.id} className="rounded-[16px] border border-red-200 bg-white/70 p-4">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex h-12 w-12 flex-none items-center justify-center rounded-[16px] border border-red-200 bg-red-100">
+                            <XCircle className="h-6 w-6 text-red-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-semibold text-gray-900">{invoice.invoice_number}</h3>
+                              <Badge className="border-0 bg-red-600 text-xs text-white">Canceled</Badge>
+                              <Badge variant="outline" className="border-red-200 text-xs text-red-700">Number reserved</Badge>
+                            </div>
+                            <p className="text-sm font-medium text-gray-700">{invoice.client_name}</p>
+                            <p className="text-xs text-gray-500">{format(parseLocalDate(invoice.start_date), 'MMM d')} - {format(parseLocalDate(invoice.end_date), 'MMM d, yyyy')}</p>
+                            <InvoiceStatusDates invoice={invoice} />
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => handleViewDetails(invoice)} className="border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-blue-600 rounded-[14px]">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -548,79 +588,45 @@ export default function InvoiceHistory({ embedded = false }) {
           }}
         />
 
-        <Dialog
-          open={!!statusChangeConfirmation}
-          onOpenChange={(open) => !open && setStatusChangeConfirmation(null)}
-        >
-          <DialogContent className="border-0 bg-white shadow-2xl sm:max-w-md sm:rounded-[24px]">
-            {statusChangeConfirmation && (() => {
-              const { invoice, status } = statusChangeConfirmation;
-              const isUnsubmitting = status === 'submitted';
-              const statusDate = isUnsubmitting ? invoice.submitted_date : invoice.paid_date;
-              const actionLabel = isUnsubmitting ? 'Mark Invoice Unsubmitted?' : 'Mark Invoice Unpaid?';
-              const keepLabel = isUnsubmitting ? 'Keep Submitted' : 'Keep Paid';
-              const confirmLabel = isUnsubmitting ? 'Mark Unsubmitted' : 'Mark Unpaid';
-              const statusLabel = isUnsubmitting ? 'Submitted' : 'Paid';
+        <InvoiceStatusModal
+          isOpen={isStatusModalOpen}
+          invoice={invoiceToManage}
+          onClose={() => {
+            setIsStatusModalOpen(false);
+            setInvoiceToManage(null);
+            setStatusUpdateError("");
+          }}
+          onSave={handleSaveStatus}
+          onCancelInvoice={handleCancelRequest}
+          isSaving={updateInvoiceMutation.isPending}
+          error={statusUpdateError}
+        />
 
-              return (
-                <>
-                  <DialogHeader>
-                    <DialogTitle className="text-gray-900">{actionLabel}</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    {statusUpdateError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-900">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Invoice status was not updated</AlertTitle>
-                        <AlertDescription>{statusUpdateError}</AlertDescription>
-                      </Alert>
-                    )}
-                    <p className="text-gray-600">
-                      {isUnsubmitting
-                        ? `This will return ${invoice.invoice_number} to draft status and clear its submitted date.`
-                        : `This will move ${invoice.invoice_number} back to open invoices and clear its paid date.`}
-                    </p>
-                    <div className={`rounded-[16px] border p-4 ${
-                      isUnsubmitting ? 'border-blue-100 bg-blue-50/60' : 'border-green-100 bg-green-50/60'
-                    }`}>
-                      <div className="flex items-start gap-3">
-                        <div className={`flex h-10 w-10 flex-none items-center justify-center rounded-[12px] ${
-                          isUnsubmitting ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
-                        }`}>
-                          {isUnsubmitting ? <FileText className="h-5 w-5" /> : <DollarSign className="h-5 w-5" />}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-gray-900">{invoice.client_name}</p>
-                          <p className="text-sm text-gray-600">{invoice.invoice_number} · ${invoice.total_amount.toFixed(2)}</p>
-                          <p className={`mt-2 text-sm font-medium ${isUnsubmitting ? 'text-blue-700' : 'text-green-700'}`}>
-                            {statusLabel}: {formatStatusDate(statusDate)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setStatusChangeConfirmation(null)}
-                      disabled={updateInvoiceMutation.isPending}
-                      className="rounded-[14px] border-gray-200 text-gray-700 hover:bg-gray-100"
-                    >
-                      {keepLabel}
-                    </Button>
-                    <Button
-                      onClick={handleConfirmStatusChange}
-                      disabled={updateInvoiceMutation.isPending}
-                      className={isUnsubmitting
-                        ? 'rounded-[14px] bg-blue-600 text-white hover:bg-blue-700'
-                        : 'rounded-[14px] border border-orange-500 bg-white text-orange-600 hover:bg-orange-50'}
-                    >
-                      {updateInvoiceMutation.isPending ? 'Updating...' : confirmLabel}
-                    </Button>
-                  </DialogFooter>
-                </>
-              );
-            })()}
+        <Dialog open={isCancelConfirmOpen} onOpenChange={(open) => !open && setIsCancelConfirmOpen(false)}>
+          <DialogContent className="border-0 bg-white shadow-2xl sm:max-w-md sm:rounded-[24px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-700">
+                <XCircle className="h-5 w-5" />
+                Cancel Invoice?
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-3">
+              <p className="text-gray-700">Cancel <span className="font-semibold">{invoiceToCancel?.invoice_number}</span> for {invoiceToCancel?.client_name}?</p>
+              <div className="rounded-[16px] border border-red-100 bg-red-50 p-4 text-sm leading-5 text-red-900">
+                This clears its submitted and paid status, releases its work dates for a replacement invoice, and permanently reserves this invoice number. It will be skipped for future invoices.
+              </div>
+              {statusUpdateError && (
+                <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-900">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Invoice was not canceled</AlertTitle>
+                  <AlertDescription>{statusUpdateError}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCancelConfirmOpen(false)} disabled={updateInvoiceMutation.isPending} className="rounded-[14px] border-gray-200 text-gray-700 hover:bg-gray-100">Keep Invoice</Button>
+              <Button variant="destructive" onClick={handleConfirmCancellation} disabled={updateInvoiceMutation.isPending} className="rounded-[14px] bg-red-600 hover:bg-red-700">{updateInvoiceMutation.isPending ? "Canceling..." : "Cancel Invoice"}</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

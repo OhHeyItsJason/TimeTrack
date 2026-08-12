@@ -96,7 +96,7 @@ export default function History() {
   // Compute statusByDateByClient from invoices
   const statusByDateByClient = {};
   invoices.forEach(invoice => {
-    if (!invoice.is_submitted && !invoice.is_paid) return;
+    if (invoice.is_canceled || (!invoice.is_submitted && !invoice.is_paid)) return;
     
     const abbr = invoice.client_abbreviation?.toUpperCase();
     if (!abbr) return;
